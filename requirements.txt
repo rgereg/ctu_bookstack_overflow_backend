@@ -1,4 +1,4 @@
-fastapi==0.111.2
+fastapi==0.128.0
 uvicorn[standard]==0.23.2
 python-jose==3.3.0
 python-dotenv==1.0.1
