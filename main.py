@@ -1,10 +1,24 @@
 from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from jose import jwt, JWTError
 from supabase import create_client
-import os
 from pydantic import BaseModel
+import os
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5500",
+    "https://rgereg.github.io"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -51,6 +65,7 @@ def get_books(user=Depends(get_current_user)):
     result = supabase.table("books").select("*").execute()
     return result.data
 
+# POST /books
 @app.post("/books")
 def add_book(book: Book, user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
@@ -62,13 +77,13 @@ def add_book(book: Book, user=Depends(get_current_user)):
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
-    uid = user.get("sub")
+    customer_id = user.get("sub")
 
     result = supabase.table("orders").select("*").execute()
     orders = result.data
 
     if role == "customer":
-        orders = [o for o in orders if o.get("customer_id") == uid]
+        orders = [o for o in orders if o.get("customer_id") == customer_id]
 
     return orders
 
@@ -77,8 +92,6 @@ def create_order(order: OrderCreate, user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
     if role != "customer":
         raise HTTPException(status_code=403, detail="Only customers can place orders")
-
-    uid = user.get("sub")
 
     book_result = supabase.table("books").select("*").eq("isbn", order.isbn).execute()
     if not book_result.data:
@@ -96,7 +109,7 @@ def create_order(order: OrderCreate, user=Depends(get_current_user)):
         "book_title": book["title"],
         "quantity": order.quantity,
         "status": "pending",
-        "customer_id": uid
+        "customer_id": user.get("sub")
     }
     result = supabase.table("orders").insert(order_data).execute()
     return result.data[0]
