@@ -64,7 +64,10 @@ def get_current_user(authorization: str = Header(...)):
 @app.get("/books")
 def get_books(user=Depends(get_current_user)):
     result = supabase.table("books").select("*").execute()
-    return result.data or []
+    books = result.data
+    if books is None:
+        books = []
+    return books
 
 @app.post("/books")
 def add_book(book: Book, user=Depends(get_current_user)):
@@ -80,7 +83,9 @@ def get_orders(user=Depends(get_current_user)):
     user_id = user.get("sub")
 
     result = supabase.table("orders").select("*").execute()
-    orders = result.data or []
+    orders = result.data
+    if orders is None:
+        orders = []
 
     if role == "customer":
         orders = [o for o in orders if o.get("customer_id") == user_id]
