@@ -27,7 +27,6 @@ def get_current_user(authorization: str = Header(...)):
         raise HTTPException(status_code=401)
 
     token = authorization.split(" ")[1]
-
     try:
         return jwt.decode(
             token,
@@ -57,26 +56,9 @@ class OrderUpdate(BaseModel):
     status: str
 
 
-class PromoteRequest(BaseModel):
-    email: str
-
-
-@app.post("/admin/promote")
-def promote_user(req: PromoteRequest, user=Depends(get_current_user)):
-    if user.get("user_metadata", {}).get("role") != "employee":
-        raise HTTPException(status_code=403)
-
-    supabase.auth.admin.update_user_by_email(
-        req.email,
-        {"user_metadata": {"role": "employee"}}
-    )
-
-    return {"status": "promoted"}
-
-
 @app.get("/books")
-def get_books(user=Depends(get_current_user)):
-    return supabase.table("books").select("*").execute().data
+def get_books():
+    return supabase.table("books").select("*").execute().data or []
 
 
 @app.post("/books")
@@ -92,9 +74,10 @@ def get_orders(user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
     email = user.get("email")
 
-    orders = supabase.table("orders").select("*").execute().data
+    orders = supabase.table("orders").select("*").execute().data or []
+
     if role == "customer":
-        orders = [o for o in orders if o["customer_email"] == email]
+        orders = [o for o in orders if o.get("customer_email") == email]
 
     return orders
 
@@ -104,11 +87,11 @@ def create_order(order: OrderCreate, user=Depends(get_current_user)):
     if user.get("user_metadata", {}).get("role") != "customer":
         raise HTTPException(status_code=403)
 
-    book = supabase.table("books").select("*").eq("isbn", order.isbn).execute().data
-    if not book:
+    books = supabase.table("books").select("*").eq("isbn", order.isbn).execute().data
+    if not books:
         raise HTTPException(status_code=404)
 
-    book = book[0]
+    book = books[0]
     if order.quantity > book["quantity"]:
         raise HTTPException(status_code=400)
 
