@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
 from pydantic import BaseModel
 from jose import jwt
+from typing import Optional
 import os
+
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -58,7 +60,9 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: str
 
-def get_current_user(authorization: str | None = Header(None)):
+
+
+def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid auth header")
 
