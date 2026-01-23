@@ -18,6 +18,19 @@ origins = [
 
 app = FastAPI()
 
+@app.middleware("http")
+async def debug_requests(request, call_next):
+    print(
+        ">",
+        request.method,
+        request.url.path,
+        ">auth:",
+        "YES" if request.headers.get("authorization") else "NO"
+    )
+    response = await call_next(request)
+    print("status: ", response.status_code)
+    return response
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
