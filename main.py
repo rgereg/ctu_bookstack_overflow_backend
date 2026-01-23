@@ -41,9 +41,9 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: str
 
-def get_current_user(authorization: str = Header(...)):
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid auth header")
+def get_current_user(authorization: str | None = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid auth header")
 
     token = authorization.split(" ")[1]
 
@@ -57,6 +57,7 @@ def get_current_user(authorization: str = Header(...)):
         return payload
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 @app.get("/books")
 def get_books():
