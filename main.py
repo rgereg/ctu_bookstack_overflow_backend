@@ -39,6 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.options("/{path:path}")
+def options_handler():
+    return {}
+
 class Book(BaseModel):
     title: str
     author: str
