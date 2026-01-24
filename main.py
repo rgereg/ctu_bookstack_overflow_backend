@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
 from pydantic import BaseModel
@@ -41,10 +41,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#@app.options("/{path:path}")
-#def options_handler():
-#    return {}
-
 class Book(BaseModel):
     title: str
     author: str
@@ -61,8 +57,14 @@ class OrderUpdate(BaseModel):
     status: str
 
 
+def get_current_user(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
 
-def get_current_user(authorization: Optional[str] = Header(None)):
+    if request.method == "OPTIONS":
+        return None
+
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid auth header")
 
@@ -156,4 +158,3 @@ def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_curr
         raise HTTPException(status_code=404, detail="Order not found")
 
     return result.data[0]
-    
