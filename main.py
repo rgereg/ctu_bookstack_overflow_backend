@@ -57,29 +57,32 @@ class OrderUpdate(BaseModel):
     status: str
 
 
-def get_current_user(
-    request: Request,
-    authorization: Optional[str] = Header(None)
-):
+#def get_current_user(
+#    request: Request,
+#    authorization: Optional[str] = Header(None)
+#):
 
     if request.method == "OPTIONS":
         return None
 
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid auth header")
+#    if not authorization or not authorization.startswith("Bearer "):
+#        raise HTTPException(status_code=401, detail="Missing or invalid auth header")
 
-    token = authorization.split(" ")[1]
+#    token = authorization.split(" ")[1]
 
-    try:
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated"
-        )
-        return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+#    try:
+#        payload = jwt.decode(
+#            token,
+#            SUPABASE_JWT_SECRET,
+#            algorithms=["HS256"],
+#            audience="authenticated"
+#        )
+#        return payload
+#    except Exception:
+#        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+
 
 
 @app.get("/books")
