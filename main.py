@@ -61,8 +61,8 @@ class OrderUpdate(BaseModel):
 #    authorization: Optional[str] = Header(None)
 #):
 
-    if request.method == "OPTIONS":
-        return None
+    #if request.method == "OPTIONS": #RG
+     #   return None    #RG
 
 #    if not authorization or not authorization.startswith("Bearer "):
 #        raise HTTPException(status_code=401, detail="Missing or invalid auth header")
