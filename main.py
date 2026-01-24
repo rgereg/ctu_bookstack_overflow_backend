@@ -154,11 +154,7 @@ def find_books(q: str):
     return result.data or []
 
 
-@app.get("/find_books")
-def find_books(q: str):
-    q = q.strip()
-    if not q:
-        return []
+
 
     result = (
         supabase
