@@ -86,7 +86,7 @@ def get_current_user(
 
 @app.get("/books")
 def get_books():
-    result = supabase.table("books").select("*").execute()
+    result = supabase.table("books").select("*").order("title", desc=False).execute()
     return result.data or []
 
 @app.post("/books")
