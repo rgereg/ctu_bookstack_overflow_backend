@@ -81,9 +81,6 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-
-
-
 @app.get("/books")
 def get_books():
     result = supabase.table("books").select("*").order("title", desc=False).execute()
@@ -160,3 +157,18 @@ def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_curr
         raise HTTPException(status_code=404, detail="Order not found")
 
     return result.data[0]
+
+# added this to test google books api
+@app.post("/add-book")
+def add_book(book: Book):
+    data = {
+        "title": book.title,
+        "isbn": book.isbn,
+        "author": book.author,
+        "image_path": book.image_path,
+        "quantity": book.quantity,
+        "price": book.price
+    }
+
+    result = supabase.table("books").insert(data).execute()
+    return {"status": "success", "data": result.data}
