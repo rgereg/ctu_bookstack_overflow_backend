@@ -1,3 +1,5 @@
+#this is the main.py.logintest file not the prime working one
+
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
