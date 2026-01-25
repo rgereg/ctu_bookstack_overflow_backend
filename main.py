@@ -1,31 +1,44 @@
-#this is the main.py.logintest file not the prime working one
+#this is the main.py.logintest file not the prime working one ~noah
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from supabase import create_client, Client
+from supabase import create_client
 from pydantic import BaseModel
-from jose import jwt, JWTError
+from jose import jwt
 from typing import Optional
 import os
+from datetime import datetime, timedelta
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 
-if not all([SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET]):
-    raise RuntimeError("Missing Supabase environment variables")
-
-app = FastAPI()
+supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 origins = [
     "http://localhost:5500",
-    "https://rgereg.github.io",
+    "https://rgereg.github.io"
 ]
+
+app = FastAPI()
+
+@app.middleware("http")
+async def debug_requests(request, call_next):
+    print(
+        ">",
+        request.method,
+        request.url.path,
+        ">auth:",
+        "YES" if request.headers.get("authorization") else "NO"
+    )
+    response = await call_next(request)
+    print("status:", response.status_code)
+    return response
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -34,7 +47,7 @@ class Book(BaseModel):
     title: str
     author: str
     isbn: str
-    description: str
+    description: Optional[str] = ""
     price: float
     quantity: int
 
@@ -45,132 +58,111 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: str
 
-def verify_jwt(authorization: Optional[str] = Header(None)) -> dict:
+def get_current_user(
+    request: Request,
+    authorization: Optional[str] = Header(None)
+):
+    if request.method == "OPTIONS":
+        return None    
+
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
+        raise HTTPException(status_code=401, detail="Missing or invalid auth header")
 
     token = authorization.split(" ")[1]
-
     try:
         payload = jwt.decode(
             token,
             SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
-            audience="authenticated",
+            audience="authenticated"
         )
         return payload
-    except JWTError:
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
-
-
-def get_supabase_client(user_jwt: str) -> Client:
-    """
-    Create a Supabase client that acts AS THE USER
-    """
-    return create_client(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        headers={
-            "Authorization": f"Bearer {user_jwt}"
-        }
-    )
-
-
-def get_current_user(
-    authorization: Optional[str] = Header(None)
-):
-    payload = verify_jwt(authorization)
-    token = authorization.split(" ")[1]
-
-    return {
-        "id": payload["sub"],
-        "role": payload.get("user_metadata", {}).get("role"),
-        "token": token,
-    }
 
 @app.get("/books")
 def get_books():
-    supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    result = supabase.table("books").select("*").order("title").execute()
+    result = supabase.table("books").select("*").order("title", desc=False).execute()
     return result.data or []
-
 
 @app.post("/books")
 def add_book(book: Book, user=Depends(get_current_user)):
-    if user["role"] != "employee":
+    role = user.get("user_metadata", {}).get("role")
+    if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
-
-    supabase = get_supabase_client(user["token"])
     result = supabase.table("books").insert(book.dict()).execute()
     return result.data[0]
 
-
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
-    supabase = get_supabase_client(user["token"])
     result = supabase.table("orders").select("*").execute()
     return result.data or []
 
-
 @app.post("/orders")
 def create_order(order: OrderCreate, user=Depends(get_current_user)):
-    supabase = get_supabase_client(user["token"])
+    user_id = user["sub"]
 
-    book_result = (
-        supabase
-        .table("books")
-        .select("*")
-        .eq("isbn", order.isbn)
-        .single()
-        .execute()
-    )
-
+    book_result = supabase.table("books").select("*").eq("isbn", order.isbn).single().execute()
     if not book_result.data:
         raise HTTPException(status_code=404, detail="Book not found")
-
     book = book_result.data
 
     if order.quantity <= 0:
         raise HTTPException(status_code=400, detail="Invalid quantity")
-
     if order.quantity > book["quantity"]:
         raise HTTPException(status_code=400, detail="Not enough stock")
 
-    supabase.table("books").update({
-        "quantity": book["quantity"] - order.quantity
-    }).eq("isbn", order.isbn).execute()
+    supabase.table("books").update({"quantity": book["quantity"] - order.quantity}).eq("isbn", order.isbn).execute()
 
     order_data = {
         "book_isbn": book["isbn"],
         "book_title": book["title"],
         "quantity": order.quantity,
         "status": "pending",
-        "customer_id": user["id"],
+        "customer_id": user_id,
+        "created_at": datetime.utcnow().isoformat()
     }
-
     result = supabase.table("orders").insert(order_data).execute()
     return result.data[0]
 
-
 @app.patch("/orders/{order_id}")
-def update_order(
-    order_id: str,
-    order_update: OrderUpdate,
-    user=Depends(get_current_user)
-):
-    if user["role"] != "employee":
+def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_current_user)):
+    role = user.get("user_metadata", {}).get("role")
+    if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    supabase = get_supabase_client(user["token"])
-    result = (
-        supabase
-        .table("orders")
-        .update({"status": order_update.status})
-        .eq("id", order_id)
-        .execute()
-    )
-
+    result = supabase.table("orders").update({"status": order_update.status}).eq("id", order_id).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Order not found")
-
     return result.data[0]
+
+@app.get("/sales/last30days")
+def sales_last_30_days(user=Depends(get_current_user)):
+    role = user.get("user_metadata", {}).get("role")
+    if role != "employee":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
+    result = supabase.table("orders").select("*").gte("created_at", thirty_days_ago).execute()
+    orders = result.data or []
+
+    sales_report = {}
+    for o in orders:
+        date_key = o["created_at"][:10]
+        sales_report.setdefault(date_key, 0)
+        sales_report[date_key] += o["quantity"] * o["price"] if "price" in o else 0
+
+    return {"last_30_days_sales": sales_report}
+
+@app.post("/add-book")
+def add_book_test(book: Book):
+    data = {
+        "title": book.title,
+        "isbn": book.isbn,
+        "author": book.author,
+        "description": book.description,
+        "quantity": book.quantity,
+        "price": book.price
+    }
+    result = supabase.table("books").insert(data).execute()
+    return {"status": "success", "data": result.data}
