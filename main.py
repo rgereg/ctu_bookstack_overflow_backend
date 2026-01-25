@@ -63,7 +63,7 @@ def get_current_user(
     authorization: Optional[str] = Header(None)
 ):
     if request.method == "OPTIONS":
-        return None    
+    return {}
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid auth header")
@@ -95,35 +95,77 @@ def add_book(book: Book, user=Depends(get_current_user)):
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
-    result = supabase.table("orders").select("*").execute()
-    return result.data or []
+    role = user.get("user_metadata", {}).get("role")
+    user_id = user["sub"]
+
+    query = (
+        supabase.table("orders")
+        .select("""
+            id,
+            status,
+            customer_id,
+            created_at,
+            order_items (
+                quantity,
+                unit_price,
+                books (
+                    title
+                )
+            )
+        """)
+    )
+
+    if role != "employee":
+        query = query.eq("customer_id", user_id)
+
+    return query.execute().data or []
+
 
 @app.post("/orders")
 def create_order(order: OrderCreate, user=Depends(get_current_user)):
     user_id = user["sub"]
 
-    book_result = supabase.table("books").select("*").eq("isbn", order.isbn).single().execute()
-    if not book_result.data:
+    book = (
+        supabase.table("books")
+        .select("*")
+        .eq("isbn", order.isbn)
+        .single()
+        .execute()
+        .data
+    )
+
+    if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    book = book_result.data
 
     if order.quantity <= 0:
         raise HTTPException(status_code=400, detail="Invalid quantity")
+
     if order.quantity > book["quantity"]:
         raise HTTPException(status_code=400, detail="Not enough stock")
 
-    supabase.table("books").update({"quantity": book["quantity"] - order.quantity}).eq("isbn", order.isbn).execute()
+    order_row = (
+        supabase.table("orders")
+        .insert({
+            "customer_id": user_id,
+            "status": "pending"
+        })
+        .execute()
+        .data[0]
+    )
 
-    order_data = {
-        "book_isbn": book["isbn"],
-        "book_title": book["title"],
+    supabase.table("order_items").insert({
+        "order_id": order_row["id"],
+        "book_id": book["id"],
         "quantity": order.quantity,
-        "status": "pending",
-        "customer_id": user_id,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    result = supabase.table("orders").insert(order_data).execute()
-    return result.data[0]
+        "unit_price": book["price"]
+    }).execute()
+
+    supabase.table("books").update({
+        "quantity": book["quantity"] - order.quantity
+    }).eq("id", book["id"]).execute()
+
+    return order_row
+
 
 @app.patch("/orders/{order_id}")
 def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_current_user)):
@@ -143,16 +185,25 @@ def sales_last_30_days(user=Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
-    result = supabase.table("orders").select("*").gte("created_at", thirty_days_ago).execute()
-    orders = result.data or []
 
-    sales_report = {}
-    for o in orders:
-        date_key = o["created_at"][:10]
-        sales_report.setdefault(date_key, 0)
-        sales_report[date_key] += o["quantity"] * o["price"] if "price" in o else 0
+    result = (
+        supabase.table("order_items")
+        .select("""
+            quantity,
+            unit_price,
+            created_at
+        """)
+        .gte("created_at", thirty_days_ago)
+        .execute()
+    )
 
-    return {"last_30_days_sales": sales_report}
+    sales = {}
+    for item in result.data or []:
+        day = item["created_at"][:10]
+        sales.setdefault(day, 0)
+        sales[day] += item["quantity"] * float(item["unit_price"])
+
+    return {"last_30_days_sales": sales}
 
 @app.post("/add-book")
 def add_book_test(book: Book):
