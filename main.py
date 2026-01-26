@@ -1,5 +1,3 @@
-#this is the main.py.logintest file not the prime working one ~noah
-
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
@@ -71,7 +69,7 @@ def get_current_user(
     authorization: Optional[str] = Header(None)
 ):
     if request.method == "OPTIONS":
-    return {}
+        return {}
 
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid auth header")
