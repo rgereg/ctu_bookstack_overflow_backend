@@ -58,6 +58,10 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: str
 
+class UpdateQuantity(BaseModel):
+    isbn: str
+    quantity: int
+
 def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None)
