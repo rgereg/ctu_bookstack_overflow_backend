@@ -230,7 +230,3 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
 
     return {"status": "success", "data": result.data}
 
-# debug routes
-print("Registered routes:")
-for route in app.routes:
-    print(route.path, route.name)
