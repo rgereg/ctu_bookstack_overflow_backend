@@ -204,7 +204,7 @@ def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    result = supabase.table("books").update({"quantity": data.quantity}).eq("isbn", data.isbn).execute()
+    result = supabase.table("books").update({"quantity": data.quantity}).eq("isbn", data.isbn).select("*").execute()
     return {"status": "success", "data": result.data}
 
 @app.post("/update_price")
@@ -213,6 +213,6 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
+    result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).select("*").execute()
     return {"status": "success", "data": result.data}
 
