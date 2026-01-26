@@ -209,19 +209,6 @@ def sales_last_30_days(user=Depends(get_current_user)):
 
     return {"last_30_days_sales": sales}
 
-@app.post("/add-book")
-def add_book_test(book: Book):
-    data = {
-        "title": book.title,
-        "isbn": book.isbn,
-        "author": book.author,
-        "description": book.description,
-        "quantity": book.quantity,
-        "price": book.price
-    }
-    result = supabase.table("books").insert(data).execute()
-    return {"status": "success", "data": result.data}
-
 @app.post("/update_quantity")
 def update_quantity(isbn, quantity):
     role = user.get("user_metadata", {}).get("role")
