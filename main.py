@@ -231,3 +231,8 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
     result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
 
     return {"status": "success", "data": result.data}
+
+# debug routes
+print("Registered routes:")
+for route in app.routes:
+    print(route.path, route.name)
