@@ -217,3 +217,12 @@ def add_book_test(book: Book):
     }
     result = supabase.table("books").insert(data).execute()
     return {"status": "success", "data": result.data}
+
+@app.post("/update_quantity")
+def update_quantity(isbn, quantity):
+    role = user.get("user_metadata", {}).get("role")
+    if role != "employee":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    result = supabase.table("books").insert({"quantity": quantity}).eq({"isbn": isbn}).execute()
+    return {"staus": "success", "data": result.data}
