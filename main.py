@@ -58,10 +58,6 @@ class OrderCreate(BaseModel):
 class OrderUpdate(BaseModel):
     status: str
 
-class UpdateQuantity(BaseModel):
-    isbn: str
-    quantity: int
-
 def get_current_user(
     request: Request,
     authorization: Optional[str] = Header(None)
@@ -217,3 +213,12 @@ def update_quantity(isbn, quantity):
     
     result = supabase.table("books").update({"quantity": quantity}).eq({"isbn": isbn}).execute()
     return {"staus": "success", "data": result.data}
+
+@app.post("/update_price")
+def update_price(isbn, price):
+    role = user.get("user_metadata", {}).get("role")
+    if role != "employee":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    
+    result = supabase.table("books").update({"price": price}).eq({"isbn": isbn}).execute()
+    return {"status": "success", "data": result.data}
