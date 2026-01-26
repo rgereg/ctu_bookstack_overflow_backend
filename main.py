@@ -224,5 +224,5 @@ def update_quantity(isbn, quantity):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    result = supabase.table("books").insert({"quantity": quantity}).eq({"isbn": isbn}).execute()
+    result = supabase.table("books").update({"quantity": quantity}).eq({"isbn": isbn}).execute()
     return {"staus": "success", "data": result.data}
