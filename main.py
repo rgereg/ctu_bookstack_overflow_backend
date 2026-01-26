@@ -2,14 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
 from pydantic import BaseModel
-from jose import jwt
 from typing import Optional
 import os
 from datetime import datetime, timedelta
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
@@ -64,27 +62,16 @@ class UpdatePrice(BaseModel):
     isbn: str
     price: float
 
-def get_current_user(
-    request: Request,
-    authorization: Optional[str] = Header(None)
-):
-    if request.method == "OPTIONS":
-        return {}
-
+def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid auth header")
+        raise HTTPException(status_code=401, detail="Missing or invalid auth header: get current user")
 
     token = authorization.split(" ")[1]
-    try:
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            audience="authenticated"
-        )
-        return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    user_resp = supabase.auth.get_user(token)
+    if not user_resp.user:
+        raise HTTPException(status_code=401, detail="Invalid token: get current user")
+
+    return user_resp.user
 
 @app.get("/books")
 def get_books():
@@ -213,7 +200,7 @@ def sales_last_30_days(user=Depends(get_current_user)):
 
 @app.post("/update_quantity")
 def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
-    role = user.get("user_metadata", {}).get("role")
+    role = user.user_metadata.get("role", "customer")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
     
@@ -222,11 +209,10 @@ def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
 
 @app.post("/update_price")
 def update_price(data: UpdatePrice, user=Depends(get_current_user)):
-    role = user.get("user_metadata", {}).get("role")
+    role = user.user_metadata.get("role", "customer")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
     result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
-
     return {"status": "success", "data": result.data}
 
