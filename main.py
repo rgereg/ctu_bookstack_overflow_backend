@@ -220,7 +220,7 @@ def update_quantity(data: UpdateQuantity):
         raise HTTPException(status_code=403, detail="Forbidden")
     
     result = supabase.table("books").update({"quantity": data.quantity}).eq("isbn", data.isbn).execute()
-    return {"staus": "success", "data": result.data}
+    return {"status": "success", "data": result.data}
 
 @app.post("/update_price")
 def update_price(data: UpdatePrice, user=Depends(get_current_user)):
