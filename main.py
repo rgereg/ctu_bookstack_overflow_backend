@@ -214,7 +214,7 @@ def sales_last_30_days(user=Depends(get_current_user)):
     return {"last_30_days_sales": sales}
 
 @app.post("/update_quantity")
-def update_quantity(data: UpdateQuantity):
+def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
