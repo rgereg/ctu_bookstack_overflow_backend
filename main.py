@@ -40,6 +40,7 @@ app.add_middleware(
 )
 
 class Book(BaseModel):
+    id: uuid
     title: str
     author: str
     isbn: str
