@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timedelta
 import os
-import uuid
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -56,11 +55,11 @@ class OrderUpdate(BaseModel):
     status: str
 
 class UpdateQuantity(BaseModel):
-    title: str
+    isbn: str
     quantity: int
 
 class UpdatePrice(BaseModel):
-    title: str
+    isbn: str
     price: float
 
 def get_current_user(authorization: Optional[str] = Header(None)):
@@ -205,7 +204,7 @@ def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    result = supabase.table("books").update({"quantity": data.quantity}).eq("title", data.title).execute()
+    result = supabase.table("books").update({"quantity": data.quantity}).eq("isbn", data.isbn).execute()
     return {"status": "success", "data": result.data}
 
 @app.post("/update_price")
@@ -214,6 +213,6 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    result = supabase.table("books").update({"price": data.price}).eq("title", data.title).execute()
+    result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
     return {"status": "success", "data": result.data}
 
