@@ -56,11 +56,11 @@ class OrderUpdate(BaseModel):
     status: str
 
 class UpdateQuantity(BaseModel):
-    id: uuid
+    title: str
     quantity: int
 
 class UpdatePrice(BaseModel):
-    id: uuid
+    title: str
     price: float
 
 def get_current_user(authorization: Optional[str] = Header(None)):
@@ -205,7 +205,7 @@ def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
     
-    result = supabase.table("books").update({"quantity": data.quantity}).eq("id", data.id).execute()
+    result = supabase.table("books").update({"quantity": data.quantity}).eq("title", data.title).execute()
     return {"status": "success", "data": result.data}
 
 @app.post("/update_price")
@@ -214,6 +214,6 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    result = supabase.table("books").update({"price": data.price}).eq("id", data.id).execute()
+    result = supabase.table("books").update({"price": data.price}).eq("title", data.title).execute()
     return {"status": "success", "data": result.data}
 
