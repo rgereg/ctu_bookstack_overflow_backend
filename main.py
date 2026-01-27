@@ -40,26 +40,26 @@ app.add_middleware(
 )
 
 class Book(BaseModel):
-    title: str
-    author: str
-    isbn: str
-    description: Optional[str] = ""
+    title: text
+    author: text
+    isbn: text
+    description: Optional[text] = ""
     price: float
-    quantity: int
+    quantity: int4
 
 class OrderCreate(BaseModel):
-    isbn: str
-    quantity: int
+    isbn: text
+    quantity: int4
 
 class OrderUpdate(BaseModel):
-    status: str
+    status: text
 
 class UpdateQuantity(BaseModel):
-    isbn: str
-    quantity: int
+    isbn: text
+    quantity: int4
 
 class UpdatePrice(BaseModel):
-    isbn: str
+    isbn: text
     price: float
 
 def get_current_user(authorization: Optional[str] = Header(None)):
