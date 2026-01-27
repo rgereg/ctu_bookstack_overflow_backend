@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client
 from pydantic import BaseModel
 from typing import Optional
-import os
 from datetime import datetime, timedelta
+import os
+import uuid
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
@@ -40,7 +41,6 @@ app.add_middleware(
 )
 
 class Book(BaseModel):
-    id: uuid
     title: str
     author: str
     isbn: str
