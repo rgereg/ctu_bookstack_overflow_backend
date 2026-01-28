@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 #FOR TESTING API W/AUTH PUT REQUEST TO UPDATE BOOKS
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials 
 from fastapi import Security
-from supabase.lib.client_options import ClientOptions
 
 from supabase import create_client
 from pydantic import BaseModel
@@ -107,11 +106,10 @@ def get_current_user(
 # by RLS and return zero rows.
 def get_supabase_authed(credentials: HTTPAuthorizationCredentials = Security(security)):
     token = credentials.credentials
-    return create_client(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        options=ClientOptions(headers={"Authorization": f"Bearer {token}"})
-    )
+    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    sb.postgrest.auth(token)
+    return sb
+
 
 
 # ******************** ROUTES *******************************
