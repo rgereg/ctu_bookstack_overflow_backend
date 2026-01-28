@@ -1,5 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials #for testing api w/auth from docs
+from fastapi import Security #for testing api w/auth from docs
+
 from supabase import create_client
 from pydantic import BaseModel
 from typing import Optional
@@ -17,6 +21,7 @@ origins = [
 ]
 
 app = FastAPI()
+security = HTTPBearer() # for testing api w/auth from docs
 
 @app.middleware("http")
 async def debug_requests(request, call_next):
@@ -66,16 +71,28 @@ class BookUpdate(BaseModel): #Added as experiment to fix books update to db
     price: float
     quantity: int
 
-def get_current_user(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid auth header: get current user")
+#def get_current_user(authorization: Optional[str] = Header(None)):
+#    if not authorization or not authorization.startswith("Bearer "):
+#        raise HTTPException(status_code=401, detail="Missing or invalid auth header: get current user")
+#
+#    token = authorization.split(" ")[1]
+#    user_resp = supabase.auth.get_user(token)
+#    if not user_resp.user:
+#        raise HTTPException(status_code=401, detail="Invalid token: get current user")
+#
+#    return user_resp.user
 
-    token = authorization.split(" ")[1]
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    token = credentials.credentials
     user_resp = supabase.auth.get_user(token)
+
     if not user_resp.user:
-        raise HTTPException(status_code=401, detail="Invalid token: get current user")
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     return user_resp.user
+
 
 @app.get("/books")
 def get_books():
