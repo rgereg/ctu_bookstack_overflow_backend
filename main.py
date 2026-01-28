@@ -1,9 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials #for testing api w/auth from docs
-from fastapi import Security #for testing api w/auth from docs
-from supabase.lib.client_options import ClientOptions #for testing api w/auth from docs
+#FOR TESTING API W/AUTH PUT REQUEST TO UPDATE BOOKS
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials 
+from fastapi import Security
+from supabase.lib.client_options import ClientOptions
 
 from supabase import create_client
 from pydantic import BaseModel
@@ -68,7 +69,8 @@ class UpdatePrice(BaseModel):
     isbn: str
     price: float
 
-class BookUpdate(BaseModel): #Added as experiment to fix books update to db
+#ADDED AS EXPERIMENT TO FIX BOOKS UPDATE TO DB
+class BookUpdate(BaseModel):
     price: float
     quantity: int
 
@@ -83,6 +85,10 @@ class BookUpdate(BaseModel): #Added as experiment to fix books update to db
 #
 #    return user_resp.user
 
+# Below extracts and validates the JWT from the Authorization header using FastAPI's
+# HTTPBearer security scheme. This function verifies the token with Supabase
+# and returns the authenticated user object. It handles authentication only;
+# authorization (such as role checks) is intentionally enforced at the route level.
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
@@ -93,8 +99,22 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token")
 
     return user_resp.user
+    
+# below creates a Supabase client that includes the current user's JWT in the request headers.
+# This is required for Row Level Security (RLS) to work correctly, because Supabase
+# evaluates policies (auth.jwt()) based on the JWT attached to the database request.
+# Using the global client (anon key only) will cause updates to be silently blocked
+# by RLS and return zero rows.
+def get_supabase_authed(credentials: HTTPAuthorizationCredentials = Security(security)):
+    token = credentials.credentials
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(headers={"Authorization": f"Bearer {token}"})
+    )
 
 
+# ******************** ROUTES *******************************
 @app.get("/books")
 def get_books():
     result = supabase.table("books").select("*").order("title", desc=False).execute()
@@ -238,29 +258,30 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
     result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
     return {"status": "success", "data": result.data}
 
-# Added below route as experiment to fix books update to db
+
+# Updates the price and quantity of an existing book identified by ISBN.
+# Access is restricted to authenticated users with the 'employee' role.
+# The update is executed using a Supabase client that includes the user's JWT
+# so that Row Level Security (RLS) policies are evaluated correctly at the
+# database layer. A 404 is returned if the ISBN does not exist or the update
+# is blocked by policy.
 @app.put("/books/{isbn}")
 def update_book(
     isbn: str,
     data: BookUpdate,
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    sb=Depends(get_supabase_authed)
 ):
     role = user.user_metadata.get("role", "customer")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    token = credentials.credentials  # the raw JWT
-
-    supabase_authed = create_client(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        options=ClientOptions(headers={"Authorization": f"Bearer {token}"})
-    )
-
     result = (
-        supabase_authed.table("books")
-        .update({"price": data.price, "quantity": data.quantity})
+        sb.table("books")
+        .update({
+            "price": data.price,
+            "quantity": data.quantity
+        })
         .eq("isbn", isbn)
         .execute()
     )
@@ -268,4 +289,7 @@ def update_book(
     if not result.data:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    return {"status": "success", "book": result.data[0]}
+    return {
+        "status": "success",
+        "book": result.data[0]
+    }
