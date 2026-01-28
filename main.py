@@ -295,9 +295,25 @@ def update_book(
     }
 
 
-# TEMPORARY DEBUG ROUTE
+# TEMPORARY DEBUG ROUTES
 # uses the same authed client AS ABOVE and does a SELECT by ISBN.
 @app.get("/debug/books/{isbn}")
 def debug_book_lookup(isbn: str, sb=Depends(get_supabase_authed)):
     res = sb.table("books").select("id,isbn,title,price,quantity").eq("isbn", isbn).execute()
     return {"rows": res.data}
+
+# temporary debug route to expose the update response
+@app.put("/debug/books/{isbn}/update")
+def debug_update_book(
+    isbn: str,
+    data: BookUpdate,
+    sb=Depends(get_supabase_authed)
+):
+    # No role check here, this is strictly to see what Supabase returns.
+    res = (
+        sb.table("books")
+        .update({"price": data.price, "quantity": data.quantity})
+        .eq("isbn", isbn)
+        .execute()
+    )
+    return {"data": res.data, "count": len(res.data or [])}
