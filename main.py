@@ -67,11 +67,11 @@ class UpdateQuantity(BaseModel):
 class UpdatePrice(BaseModel):
     isbn: str
     price: float
-
-#ADDED AS EXPERIMENT TO FIX BOOKS UPDATE TO DB
+    
 class BookUpdate(BaseModel):
-    price: float
-    quantity: int
+    price: Optional[float] = None
+    quantity: Optional[int] = None
+
 
 #def get_current_user(authorization: Optional[str] = Header(None)):
 #    if not authorization or not authorization.startswith("Bearer "):
