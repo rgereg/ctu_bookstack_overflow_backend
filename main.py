@@ -321,5 +321,6 @@ def debug_update_book(
 # debug route to return the JWT claims as Postgres sees them
 @app.get("/debug/jwt")
 def debug_jwt(sb=Depends(get_supabase_authed)):
-    res = sb.rpc("debug_jwt").execute()
-    return res.data
+    res = sb.rpc("debug_jwt", {}).execute()
+    return {"data": res.data}
+
