@@ -293,3 +293,11 @@ def update_book(
         "status": "success",
         "book": result.data[0]
     }
+
+
+# TEMPORARY DEBUG ROUTE
+# uses the same authed client AS ABOVE and does a SELECT by ISBN.
+@app.get("/debug/books/{isbn}")
+def debug_book_lookup(isbn: str, sb=Depends(get_supabase_authed)):
+    res = sb.table("books").select("id,isbn,title,price,quantity").eq("isbn", isbn).execute()
+    return {"rows": res.data}
