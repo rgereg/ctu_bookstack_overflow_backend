@@ -62,6 +62,10 @@ class UpdatePrice(BaseModel):
     isbn: str
     price: float
 
+class BookUpdate(BaseModel): #Added as experiment to fix books update to db
+    price: float
+    quantity: int
+
 def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid auth header: get current user")
@@ -216,3 +220,29 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
     result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
     return {"status": "success", "data": result.data}
 
+# Added below route as experiment to fix books update to db
+@app.put("/books/{isbn}")
+def update_book(isbn: str, data: BookUpdate, user=Depends(get_current_user)):
+    # ROLE CHECK
+    role = user.user_metadata.get("role", "customer")
+    if role != "employee":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    # ONLY REACHES HERE IF EMPLOYEE
+    result = (
+        supabase.table("books")
+        .update({
+            "price": data.price,
+            "quantity": data.quantity
+        })
+        .eq("isbn", isbn)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    return {
+        "status": "success",
+        "book": result.data[0]
+    }
