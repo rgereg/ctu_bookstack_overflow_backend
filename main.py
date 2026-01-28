@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials #for testing api w/auth from docs
 from fastapi import Security #for testing api w/auth from docs
+from supabase.lib.client_options import ClientOptions #for testing api w/auth from docs
 
 from supabase import create_client
 from pydantic import BaseModel
@@ -239,19 +240,27 @@ def update_price(data: UpdatePrice, user=Depends(get_current_user)):
 
 # Added below route as experiment to fix books update to db
 @app.put("/books/{isbn}")
-def update_book(isbn: str, data: BookUpdate, user=Depends(get_current_user)):
-    # ROLE CHECK
+def update_book(
+    isbn: str,
+    data: BookUpdate,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    user=Depends(get_current_user)
+):
     role = user.user_metadata.get("role", "customer")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
 
-    # ONLY REACHES HERE IF EMPLOYEE
+    token = credentials.credentials  # the raw JWT
+
+    supabase_authed = create_client(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY,
+        options=ClientOptions(headers={"Authorization": f"Bearer {token}"})
+    )
+
     result = (
-        supabase.table("books")
-        .update({
-            "price": data.price,
-            "quantity": data.quantity
-        })
+        supabase_authed.table("books")
+        .update({"price": data.price, "quantity": data.quantity})
         .eq("isbn", isbn)
         .execute()
     )
@@ -259,7 +268,4 @@ def update_book(isbn: str, data: BookUpdate, user=Depends(get_current_user)):
     if not result.data:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    return {
-        "status": "success",
-        "book": result.data[0]
-    }
+    return {"status": "success", "book": result.data[0]}
