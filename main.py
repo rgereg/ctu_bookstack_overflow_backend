@@ -69,8 +69,9 @@ class UpdatePrice(BaseModel):
     price: float
     
 class BookUpdate(BaseModel):
-    price: Optional[float] = None
-    quantity: Optional[int] = None
+    price: float
+    quantity: int
+
 
 
 #def get_current_user(authorization: Optional[str] = Header(None)):
