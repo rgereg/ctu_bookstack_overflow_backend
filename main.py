@@ -142,6 +142,8 @@ def add_book(
         .execute()
     )
 
+    return result.data[0]
+
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
