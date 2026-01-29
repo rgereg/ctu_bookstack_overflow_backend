@@ -120,12 +120,27 @@ def get_books():
     return result.data or []
 
 @app.post("/books")
-def add_book(book: Book, user=Depends(get_current_user)):
-    role = user.get("user_metadata", {}).get("role")
+def add_book(
+    #role = user.get("user_metadata", {}).get("role")
+    #if role != "employee":
+    #    raise HTTPException(status_code=403, detail="Forbidden")
+    #result = supabase.table("books").insert(book.dict()).execute()
+    #return result.data[0]
+
+    # Trying to get add book to work using methods from update price/quantity, feel free to remove if not working -Tommy
+    Book: newBook,
+    user=Depends(get_current_user),
+    sb=Depends(get_supabase_authed)
+):
+    role = user.user_metadata.get("role", "customer")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
-    result = supabase.table("books").insert(book.dict()).execute()
-    return result.data[0]
+
+    result = (
+        sb.table("books")
+        .insert(newBook.dict())
+        .execute()
+    )
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
