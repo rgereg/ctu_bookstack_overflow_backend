@@ -135,7 +135,6 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 
     # Search order table by userID, table added here
     result = sb.table("orders").select("*").eq("customer_id", userID).eq("status", "pending").execute()
-    result = sb.table("order_items").select("*").eq("order_id", result.id).execute()
     return result.data or []
 
 @app.get("/orders")
