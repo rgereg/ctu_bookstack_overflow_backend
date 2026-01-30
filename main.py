@@ -120,7 +120,7 @@ def get_books():
     return result.data or []
 
 @app.post("/books")
-def add_book(
+def add_book()
     #role = user.get("user_metadata", {}).get("role")
     #if role != "employee":
     #    raise HTTPException(status_code=403, detail="Forbidden")
