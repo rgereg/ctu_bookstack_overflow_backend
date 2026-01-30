@@ -130,12 +130,13 @@ def get_books():
 # Adding a specific get function for carts, requesting them based on the user ID
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    # Get the user ID
-    userID = user.id
 
-    # Search order table by userID, table added here
-    result = sb.table("order_items").select("*").execute()
+    # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on userID
+    # Going to try to implement the same rules for the order page with an exception for employees to see all -Tommy
+    result = sb.from_("order_items").select("quantity, unit_price, books(title)").execute()
     return result.data or []
+
+
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
