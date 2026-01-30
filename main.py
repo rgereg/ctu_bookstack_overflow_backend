@@ -4,13 +4,12 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
-
+import uuid
 
 from supabase import create_client, Client
 
 SUPABASE_URL = "https://ajvplpbxsrxgdldcosdf.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqdnBscGJ4c3J4Z2RsZGNvc2RmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NjQ0ODksImV4cCI6MjA4NDM0MDQ4OX0.Uw5xQLK2TSYeEVDzTYW0jwwui_1CMS_pfPpl4h5_bLk"
-
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
@@ -60,13 +59,11 @@ def get_user(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
     return user_res.user
 
-
-#load
 @app.get("/books")
 async def get_books():
     res = supabase.table("books").select("*").execute()
     if getattr(res, "status_code", 200) != 200:
-        raise HTTPException(status_code=500, detail=f"Supabase request failed ({res.status_code})")
+        raise HTTPException(status_code=500, detail=f"Supabase request failed with {res.status_code}")
     return res.data
 
 #checkout stuff
@@ -78,23 +75,15 @@ async def checkout(payload: CheckoutPayload, request: Request):
 
     book_ids = [item.book_id for item in payload.items]
     stock_res = supabase.table("books").select("id, quantity, price").in_("id", book_ids).execute()
-
     if getattr(stock_res, "status_code", 200) != 200:
         raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(stock_res, 'status_code', 'unknown')}")
-
-    if not stock_res.data:
-        raise HTTPException(status_code=400, detail="No matching books found")
-
     stock_map = {b["id"]: b for b in stock_res.data}
 
     for item in payload.items:
         if item.book_id not in stock_map:
             raise HTTPException(status_code=400, detail=f"Book {item.book_id} not found")
         if stock_map[item.book_id]["quantity"] < item.quantity:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Not enough stock for book {item.book_id}"
-            )
+            raise HTTPException(status_code=400, detail=f"Not enough stock for book {item.book_id}")
 
     order_number_res = supabase.table("orders").select("order_number").order("order_number", desc=True).limit(1).execute()
     if getattr(order_number_res, "status_code", 200) != 200:
@@ -104,29 +93,29 @@ async def checkout(payload: CheckoutPayload, request: Request):
         next_order_number = order_number_res.data[0]["order_number"] + 1
 
     # Create order
-    order_res = supabase.table("orders").insert({
+    order_id = str(uuid.uuid4())
+    order_res = supabase.table("orders").insert([{
+        "id": order_id,
         "customer_id": customer_id,
         "status": "pending",
         "type": "online",
         "order_number": next_order_number,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow()
-    }).execute()
+    }]).execute()
     if getattr(order_res, "status_code", 200) != 200:
         raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(order_res, 'status_code', 'unknown')}")
-    
-    order_id = order_res.data[0]["id"]
 
     order_items_payload = []
     for item in payload.items:
         order_items_payload.append({
+            "id": str(uuid.uuid4()),
             "order_id": order_id,
             "book_id": item.book_id,
             "quantity": item.quantity,
             "unit_price": float(stock_map[item.book_id]["price"]),
             "created_at": datetime.utcnow()
         })
-
     items_res = supabase.table("order_items").insert(order_items_payload).execute()
     if getattr(items_res, "status_code", 200) != 200:
         raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(items_res, 'status_code', 'unknown')}")
@@ -140,8 +129,7 @@ async def checkout(payload: CheckoutPayload, request: Request):
         if getattr(update_res, "status_code", 200) != 200:
             raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(update_res, 'status_code', 'unknown')}")
 
-    return {"message": "Order placed successfully", "order_id": order_id}
-
+    return {"message": "Order placed successfully", "order_id": order_id, "order_number": next_order_number}
 
 @app.post("/update_price")
 async def update_price(payload: UpdatePricePayload, request: Request):
@@ -149,15 +137,13 @@ async def update_price(payload: UpdatePricePayload, request: Request):
     user = get_user(token)
     if user.user_metadata.get("role") != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
-
     res = supabase.table("books").update({
         "price": Decimal(str(payload.price)),
         "updated_at": datetime.utcnow()
     }).eq("isbn", payload.isbn).execute()
     if getattr(res, "status_code", 200) != 200:
-        raise HTTPException(status_code=500, detail=f"Supabase request failed ({res.status_code})")
+        raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(res, 'status_code', 'unknown')}")
     return {"message": "Price updated"}
-
 
 @app.post("/update_quantity")
 async def update_quantity(payload: UpdateQuantityPayload, request: Request):
@@ -165,14 +151,12 @@ async def update_quantity(payload: UpdateQuantityPayload, request: Request):
     user = get_user(token)
     if user.user_metadata.get("role") != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
-
     res = supabase.table("books").update({
         "quantity": payload.quantity,
         "updated_at": datetime.utcnow()
     }).eq("isbn", payload.isbn).execute()
     if getattr(res, "status_code", 200) != 200:
-        raise HTTPException(status_code=500, detail=f"Supabase request failed ({res.status_code})")
-
+        raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(res, 'status_code', 'unknown')}")
     return {"message": "Quantity updated"}
 
 #order stuff
@@ -210,8 +194,7 @@ async def get_orders(customer_id: Optional[str] = None, request: Request = None)
 
     res = query.execute()
     if getattr(res, "status_code", 200) != 200:
-        raise HTTPException(status_code=500, detail=f"Supabase request failed ({res.status_code})")
-
+        raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(res, 'status_code', 'unknown')}")
     return res.data
 
 @app.get("/order_items")
@@ -224,7 +207,7 @@ async def get_order_items(order_id: str, request: Request):
     if role == "employee":
         res = supabase.table("order_items").select("*").eq("order_id", order_id).execute()
         if getattr(res, "status_code", 200) != 200:
-            raise HTTPException(status_code=500, detail=f"Supabase request failed ({res.status_code})")
+            raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(res, 'status_code', 'unknown')}")
         return res.data
 
     # customer can access only own order
@@ -234,5 +217,5 @@ async def get_order_items(order_id: str, request: Request):
 
     res = supabase.table("order_items").select("*").eq("order_id", order_id).execute()
     if getattr(res, "status_code", 200) != 200:
-        raise HTTPException(status_code=500, detail=f"Supabase request failed ({res.status_code})")
+        raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(res, 'status_code', 'unknown')}")
     return res.data
