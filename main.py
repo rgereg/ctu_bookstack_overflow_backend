@@ -78,8 +78,12 @@ async def checkout(payload: CheckoutPayload, request: Request):
 
     book_ids = [item.book_id for item in payload.items]
     stock_res = supabase.table("books").select("id, quantity, price").in_("id", book_ids).execute()
+
     if getattr(stock_res, "status_code", 200) != 200:
         raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(stock_res, 'status_code', 'unknown')}")
+
+    if not stock_res.data:
+        raise HTTPException(status_code=400, detail="No matching books found")
 
     stock_map = {b["id"]: b for b in stock_res.data}
 
@@ -87,17 +91,19 @@ async def checkout(payload: CheckoutPayload, request: Request):
         if item.book_id not in stock_map:
             raise HTTPException(status_code=400, detail=f"Book {item.book_id} not found")
         if stock_map[item.book_id]["quantity"] < item.quantity:
-            raise HTTPException(status_code=400, detail=f"Not enough stock for book {item.book_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Not enough stock for book {item.book_id}"
+            )
 
-    # Create order
     order_number_res = supabase.table("orders").select("order_number").order("order_number", desc=True).limit(1).execute()
     if getattr(order_number_res, "status_code", 200) != 200:
         raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(order_number_res, 'status_code', 'unknown')}")
-    
     next_order_number = 1
     if order_number_res.data:
         next_order_number = order_number_res.data[0]["order_number"] + 1
 
+    # Create order
     order_res = supabase.table("orders").insert({
         "customer_id": customer_id,
         "status": "pending",
