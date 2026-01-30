@@ -130,40 +130,17 @@ def get_books():
 # Adding a specific get function for carts, requesting them based on the user ID
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-
-    # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on userID
+    # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on customer's user_id
+    # Still will need to filter based on pending orders or some other method
     # Going to try to implement the same rules for the order page with an exception for employees to see all -Tommy
     result = sb.from_("order_items").select("quantity, books(title, price)").execute()
     return result.data or []
 
-
-
 @app.get("/orders")
-def get_orders(user=Depends(get_current_user)):
-    role = user.user_metadata.get("role")
-    user_id = user.id
-
-    query = (
-        supabase.table("orders")
-        .select("""
-            id,
-            status,
-            customer_id,
-            created_at,
-            order_items (
-                quantity,
-                unit_price,
-                books (
-                    title
-                )
-            )
-        """)
-    )
-
-    if role != "employee":
-        query = query.eq("customer_id", user_id)
-
-    return query.execute().data or []
+def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    # Same deal as /cart now, information is filtered through RLS on supabase. Employees should see all while customers only see orders tied to their user_id
+    result = sb.table("orders").select("*").execute()
+    return result.data or []
 
 
 @app.post("/orders")
