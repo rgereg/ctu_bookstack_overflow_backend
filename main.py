@@ -144,6 +144,16 @@ def add_book(
 
     return result.data[0]
 
+# Adding a specific get function for carts, requesting them based on the user ID
+@app.get("/cart")
+def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    # Get the user ID
+    userID = user.id
+
+    # Search order table by userID
+    result = sb.select("*").eq("customer_id", userID).execute()
+    return result.data or []
+
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user)):
     role = user.get("user_metadata", {}).get("role")
