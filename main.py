@@ -76,17 +76,68 @@ async def checkout(payload: CheckoutPayload, request: Request):
     user = get_user(token)
     customer_id = user.id
 
-    res = supabase.postgrest.rpc(
-        "checkout_transaction",
-        params={
-            "customer_uuid": customer_id,
-            "items": [item.dict() for item in payload.items]
-        }
-    ).execute()
+    book_ids = [item.book_id for item in payload.items]
+    stock_res = supabase.table("books").select("id, quantity, price").in_("id", book_ids).execute()
+    if stock_res.error:
+        raise HTTPException(status_code=500, detail=stock_res.error.message)
 
-    if res.error:
-        raise HTTPException(status_code=400, detail=res.error.message)
-    return res.data
+    stock_map = {b["id"]: b for b in stock_res.data}
+
+    for item in payload.items:
+        if item.book_id not in stock_map:
+            raise HTTPException(status_code=400, detail=f"Book {item.book_id} not found")
+        if stock_map[item.book_id]["quantity"] < item.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Not enough stock for book {item.book_id}"
+            )
+
+    # Create order
+    order_number_res = supabase.table("orders").select("order_number").order("order_number", desc=True).limit(1).execute()
+    if order_number_res.error:
+        raise HTTPException(status_code=500, detail=order_number_res.error.message)
+    next_order_number = 1
+    if order_number_res.data:
+        next_order_number = order_number_res.data[0]["order_number"] + 1
+
+    order_res = supabase.table("orders").insert({
+        "customer_id": customer_id,
+        "status": "pending",
+        "type": "online",
+        "order_number": next_order_number,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }).execute()
+
+    if order_res.error:
+        raise HTTPException(status_code=500, detail=order_res.error.message)
+
+    order_id = order_res.data[0]["id"]
+
+    order_items_payload = []
+    for item in payload.items:
+        order_items_payload.append({
+            "order_id": order_id,
+            "book_id": item.book_id,
+            "quantity": item.quantity,
+            "unit_price": float(stock_map[item.book_id]["price"]),
+            "created_at": datetime.utcnow()
+        })
+
+    items_res = supabase.table("order_items").insert(order_items_payload).execute()
+    if items_res.error:
+        raise HTTPException(status_code=500, detail=items_res.error.message)
+
+    for item in payload.items:
+        new_qty = stock_map[item.book_id]["quantity"] - item.quantity
+        update_res = supabase.table("books").update({
+            "quantity": new_qty,
+            "updated_at": datetime.utcnow()
+        }).eq("id", item.book_id).execute()
+        if update_res.error:
+            raise HTTPException(status_code=500, detail=update_res.error.message)
+
+    return {"message": "Order placed successfully", "order_id": order_id}
 
 
 @app.post("/update_price")
@@ -122,23 +173,26 @@ async def update_quantity(payload: UpdateQuantityPayload, request: Request):
 
 #order stuff
 @app.get("/orders")
-async def get_orders(customer_id: Optional[str] = None, request: Request = None):
+async def get_orders(request: Request):
     token = get_jwt(request)
     user = get_user(token)
     role = user.user_metadata.get("role")
 
-    if customer_id:
-        if user.id != customer_id and role != "employee":
-            raise HTTPException(status_code=403, detail="Forbidden")
-        res = supabase.table("orders").select("*").eq("customer_id", customer_id).execute()
+    if role == "employee":
+        orders_res = supabase.table("orders").select("*").execute()
     else:
-        if role != "employee":
-            raise HTTPException(status_code=403, detail="Forbidden")
-        res = supabase.table("orders").select("*").execute()
+        orders_res = supabase.table("orders").select("*").eq("customer_id", user.id).execute()
 
-    if res.error:
-        raise HTTPException(status_code=500, detail=res.error.message)
-    return res.data
+    if orders_res.error:
+        raise HTTPException(status_code=500, detail=orders_res.error.message)
+
+    orders_data = orders_res.data
+
+    for order in orders_data:
+        items_res = supabase.table("order_items").select("*").eq("order_id", order["id"]).execute()
+        order["items"] = items_res.data if items_res.data else []
+
+    return orders_data
 
 @app.get("/order_items")
 async def get_order_items(order_id: str, request: Request):
