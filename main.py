@@ -173,52 +173,43 @@ async def update_quantity(payload: UpdateQuantityPayload, request: Request):
 
 #order stuff
 @app.get("/orders")
-async def get_orders(request: Request):
+async def get_orders(customer_id: Optional[str] = None, request: Request = None):
     token = get_jwt(request)
     user = get_user(token)
     role = user.user_metadata.get("role")
 
-    if role == "employee":
-        orders_res = supabase.table("orders").select("*").execute()
-        if orders_res.error:
-            raise HTTPException(status_code=500, detail=orders_res.error.message)
-        orders_data = orders_res.data
+    query = supabase.table("orders").select(
+        """
+        id,
+        order_number,
+        customer_id,
+        status,
+        created_at,
+        order_items (
+            quantity,
+            unit_price,
+            book_id,
+            books (
+                title
+            )
+        )
+        """
+    )
 
-        order_ids = [o["id"] for o in orders_data]
-        items_res = supabase.table("order_items").select("*").in_("order_id", order_ids).execute()
-        if items_res.error:
-            raise HTTPException(status_code=500, detail=items_res.error.message)
-        items_data = items_res.data
-
-        order_items_map = {}
-        for item in items_data:
-            order_items_map.setdefault(item["order_id"], []).append(item)
-
-        for order in orders_data:
-            order["items"] = order_items_map.get(order["id"], [])
-
-        # Group by customer_id
-        grouped_orders = {}
-        for order in orders_data:
-            cust_id = order["customer_id"]
-            grouped_orders.setdefault(cust_id, []).append(order)
-
-        return grouped_orders
-
+    if customer_id:
+        if user.id != customer_id and role != "employee":
+            raise HTTPException(status_code=403, detail="Forbidden")
+        query = query.eq("customer_id", customer_id)
     else:
-        # Customer sees only their own orders
-        orders_res = supabase.table("orders").select("*").eq("customer_id", user.id).execute()
-        if orders_res.error:
-            raise HTTPException(status_code=500, detail=orders_res.error.message)
-        orders_data = orders_res.data
+        if role != "employee":
+            raise HTTPException(status_code=403, detail="Forbidden")
 
-        # Fetch items for each order
-        for order in orders_data:
-            items_res = supabase.table("order_items").select("*").eq("order_id", order["id"]).execute()
-            order["items"] = items_res.data if items_res.data else []
+    res = query.execute()
 
-        return orders_data
+    if res.error:
+        raise HTTPException(status_code=500, detail=res.error.message)
 
+    return res.data
 
 @app.get("/order_items")
 async def get_order_items(order_id: str, request: Request):
