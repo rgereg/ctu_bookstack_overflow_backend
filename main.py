@@ -127,23 +127,6 @@ def add_book(
     #result = supabase.table("books").insert(book.dict()).execute()
     #return result.data[0]
 
-    # Trying to get add book to work using methods from update price/quantity, feel free to remove if not working -Tommy
-    Book: newBook,
-    user=Depends(get_current_user),
-    sb=Depends(get_supabase_authed)
-):
-    role = user.user_metadata.get("role", "customer")
-    if role != "employee":
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    result = (
-        sb.table("books")
-        .insert(newBook.dict())
-        .execute()
-    )
-
-    return result.data[0]
-
 # Adding a specific get function for carts, requesting them based on the user ID
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
