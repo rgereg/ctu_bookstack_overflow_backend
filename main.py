@@ -133,7 +133,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 
     # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on userID
     # Going to try to implement the same rules for the order page with an exception for employees to see all -Tommy
-    result = sb.from_("order_items").select("quantity, unit_price, books(title)").execute()
+    result = sb.from_("order_items").select("quantity, books(title, price)").execute()
     return result.data or []
 
 
