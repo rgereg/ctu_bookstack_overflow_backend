@@ -167,7 +167,7 @@ def get_orders(user=Depends(get_current_user)):
 
 @app.post("/orders")
 def create_order(order: OrderCreate, user=Depends(get_current_user)):
-    user_id = user["sub"]
+    user_id = user.id
 
     book = (
         supabase.table("books")
