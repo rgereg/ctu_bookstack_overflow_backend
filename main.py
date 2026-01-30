@@ -256,25 +256,6 @@ def sales_last_30_days(user=Depends(get_current_user)):
 
     return {"last_30_days_sales": sales}
 
-@app.post("/update_quantity")
-def update_quantity(data: UpdateQuantity, user=Depends(get_current_user)):
-    role = user.user_metadata.get("role", "customer")
-    if role != "employee":
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    result = supabase.table("books").update({"quantity": data.quantity}).eq("isbn", data.isbn).execute()
-    return {"status": "success", "data": result.data}
-
-@app.post("/update_price")
-def update_price(data: UpdatePrice, user=Depends(get_current_user)):
-    role = user.user_metadata.get("role", "customer")
-    if role != "employee":
-        raise HTTPException(status_code=403, detail="Forbidden")
-    
-    result = supabase.table("books").update({"price": data.price}).eq("isbn", data.isbn).execute()
-    return {"status": "success", "data": result.data}
-
-
 # Updates the price and quantity of an existing book identified by ISBN.
 # Access is restricted to authenticated users with the 'employee' role.
 # The update is executed using a Supabase client that includes the user's JWT
