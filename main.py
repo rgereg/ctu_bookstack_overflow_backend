@@ -228,39 +228,23 @@ def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_curr
 
 @app.get("/sales/last30days")
 def sales_last_30_days(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    role = user.get("user_metadata", {}).get("role")
+    if not user or not getattr(user, "user_metadata", None):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    role = user.user_metadata.get("role", "customer")
     if role != "employee":
-        raise HTTPException(status_code=403)
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
 
     result = (
         sb.table("order_items")
-        .select("""
-            quantity,
-            unit_price,
-            created_at,
-            orders ( status, customer_id ),
-            books ( title )
-        """)
+        .select("*")
         .gte("created_at", thirty_days_ago)
         .execute()
     )
 
-    rows = []
-    for item in result.data or []:
-        rows.append({
-            "created_at": item["created_at"],
-            "book_title": item["books"]["title"],
-            "quantity": item["quantity"],
-            "unit_price": item["unit_price"],
-            "status": item["orders"]["status"],
-            "customer_id": item["orders"]["customer_id"]
-        })
-
-    return rows
-
-
+    return result.data or []
 
 # Updates the price and quantity of an existing book identified by ISBN.
 # Access is restricted to authenticated users with the 'employee' role.
