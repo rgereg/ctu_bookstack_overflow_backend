@@ -22,7 +22,7 @@ origins = [
 ]
 
 app = FastAPI()
-security = HTTPBearer() # for testing api w/auth from docs
+security = HTTPBearer()  # for testing api w/auth from docs
 
 @app.middleware("http")
 async def debug_requests(request, call_next):
@@ -42,8 +42,9 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
 
 class Book(BaseModel):
     title: str
