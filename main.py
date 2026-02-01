@@ -145,7 +145,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     return result.data or []
 
 # Adding items to cart
-@app.put("/cart")
+@app.post("/cart")
 def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depends(get_supabase_authed)):
     # Check if customer already has a cart started
     cartCheck = sb.table("orders").select("id").eq("type", "cart").execute()
