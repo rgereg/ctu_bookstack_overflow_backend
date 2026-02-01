@@ -159,7 +159,7 @@ def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depend
     
     # Find book by isbn and insert book id and amount to the order items table under order id
     book = sb.table("books").select("id").eq("isbn", cartData.isbn).execute()
-    result = sb.table("order_items").insert({"order_id": order_id, "book_id": book.id, "quantity": cartData.quantity})
+    result = sb.table("order_items").insert({"order_id": order_id, "book_id": book.id, "quantity": cartData.quantity}).execute()
     return result.data or []
 
 @app.get("/orders")
