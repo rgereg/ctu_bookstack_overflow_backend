@@ -227,31 +227,46 @@ def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_curr
     return result.data[0]
 
 @app.get("/sales/last30days")
-def sales_last_30_days(user=Depends(get_current_user)):
-    role = user.get("user_metadata", {}).get("role")
-    if role != "employee":
-        raise HTTPException(status_code=403, detail="Forbidden")
+def sales_last_30_days(
+    user=Depends(get_current_user),
+    sb=Depends(get_supabase_authed)
+):
+    if user.user_metadata.get("role") != "employee":
+        raise HTTPException(status_code=403)
 
     thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
 
     result = (
-        supabase.table("order_items")
+        sb.table("order_items")
         .select("""
             quantity,
             unit_price,
-            created_at
+            orders (
+                created_at,
+                status,
+                customer_id
+            ),
+            books (
+                title
+            )
         """)
-        .gte("created_at", thirty_days_ago)
+        .gte("orders.created_at", thirty_days_ago)
         .execute()
     )
 
-    sales = {}
+    rows = []
     for item in result.data or []:
-        day = item["created_at"][:10]
-        sales.setdefault(day, 0)
-        sales[day] += item["quantity"] * float(item["unit_price"])
+        rows.append({
+            "created_at": item["orders"]["created_at"],
+            "book_title": item["books"]["title"],
+            "quantity": item["quantity"],
+            "unit_price": item["unit_price"],
+            "status": item["orders"]["status"],
+            "customer_id": item["orders"]["customer_id"]
+        })
 
-    return {"last_30_days_sales": sales}
+    return rows
+
 
 # Updates the price and quantity of an existing book identified by ISBN.
 # Access is restricted to authenticated users with the 'employee' role.
