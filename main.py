@@ -248,41 +248,30 @@ def sales_last_30_days(user=Depends(get_current_user), sb=Depends(get_supabase_a
 '''
 @app.get("/sales/last30days")
 def sales_last_30_days(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    if not user or not getattr(user, "user_metadata", None):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    role = user.user_metadata.get("role", "customer")
+    role = user.user_metadata.get("role")
     if role != "employee":
-        raise HTTPException(status_code=403, detail="Forbidden")
+        raise HTTPException(status_code=403)
 
-    thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
+    items = sb.table("order_items").select("*").execute().data
 
-    result = (
-        sb.table("order_items")
-        .select("""
-            quantity,
-            unit_price,
-            created_at,
-            orders!inner(status, customer_id),
-            books!inner(title)
-        """)
-        .gte("created_at", thirty_days_ago)
-        .execute()
-    )
+    books = {b["id"]: b for b in sb.table("books").select("id,title").execute().data}
+
+    orders = {o["id"]: o for o in sb.table("orders").select("id,status,customer_id").execute().data}
 
     rows = []
-    for item in result.data or []:
+    for item in items:
+        book = books.get(item["book_id"], {})
+        order = orders.get(item["order_id"], {})
         rows.append({
             "created_at": item.get("created_at"),
-            "book_title": item.get("books", {}).get("title", "N/A"),
-            "quantity": item.get("quantity", 0),
-            "unit_price": item.get("unit_price", 0),
-            "status": item.get("orders", {}).get("status", "N/A"),
-            "customer_id": item.get("orders", {}).get("customer_id", "N/A")
+            "book_title": book.get("title"),
+            "quantity": item.get("quantity"),
+            "unit_price": item.get("unit_price"),
+            "status": order.get("status"),
+            "customer_id": order.get("customer_id")
         })
 
     return rows
-
 
 # Updates the price and quantity of an existing book identified by ISBN.
 # Access is restricted to authenticated users with the 'employee' role.
