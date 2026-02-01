@@ -53,6 +53,10 @@ class Book(BaseModel):
     price: float
     quantity: int
 
+class CartAdd(BaseModel):
+    isbn: str
+    quantity: int
+
 class OrderCreate(BaseModel):
     isbn: str
     quantity: int
@@ -138,6 +142,24 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on customer's user_id
     # Cart is working again, have to ensure no duplicate carts are present for the same user id or CORS errors pop up -Tommy
     result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").execute()
+    return result.data or []
+
+# Adding items to cart
+@app.put("/cart")
+def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depends(get_supabase_authed)):
+    # Check if customer already has a cart started
+    cartCheck = sb.table("orders").select("id").eq("type", "cart").execute()
+
+    # If not, create a cart order to begin adding to
+    if not cartCheck:
+        insertData = sb.table("orders").insert({"customer_id": user.id, "status": "pending", "type": "cart"}).execute()
+        order_id = insertData.id
+    else:
+        order_id = cartCheck.id
+    
+    # Find book by isbn and insert book id and amount to the order items table under order id
+    book = sb.table("books").select("id").eq("isbn", cartData.isbn).execute()
+    result = sb.table("order_items").insert({"order_id": order_id, "book_id": book.id, "quantity": cartData.quantity})
     return result.data or []
 
 @app.get("/orders")
