@@ -152,7 +152,7 @@ def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depend
 
     # If not, create a cart order to begin adding to
     if not cartCheck:
-        insertData = sb.table("orders").insert({"customer_id": user.id, "status": "pending", "type": "cart"}).execute()
+        insertData = sb.table("orders").insert({"status": "pending", "type": "cart"}).execute()
         order_id = insertData.id
     else:
         order_id = cartCheck.id
