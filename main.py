@@ -140,8 +140,8 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on customer's user_id
-    # Cart is working again, have to ensure no duplicate carts are present for the same user id or CORS errors pop up -Tommy
-    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").execute()
+    # Something changed in RLS again, limiting info on cart page to just orders that are type cart
+    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").eq("type", "cart").execute()
     return result.data or []
 
 # Adding items to cart
