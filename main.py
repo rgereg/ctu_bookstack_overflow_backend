@@ -302,23 +302,6 @@ def update_book(
         "book": result.data[0]
     }
 
-@app.get("/dashboard")#this is a test to check mismatches
-def dashboard(user = Depends(get_current_user)):
-    jwt = user["jwt"]
-
-    supabase.postgrest.auth(jwt)
-
-    books = supabase.table("books").select("*").execute().data
-    orders = supabase.table("orders").select("*").execute().data
-    order_items = supabase.table("order_items").select("*").execute().data
-
-    return {
-        "books": books,
-        "orders": orders,
-        "order_items": order_items
-    }
-
-
 # TEMPORARY DEBUG ROUTES
 # uses the same authed client AS ABOVE and does a SELECT by ISBN.
 @app.get("/debug/books/{isbn}")
