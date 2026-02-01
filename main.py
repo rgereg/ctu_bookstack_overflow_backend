@@ -115,6 +115,18 @@ def get_supabase_authed(credentials: HTTPAuthorizationCredentials = Security(sec
     sb.postgrest.auth(token)
     return sb
 
+#authorization stuff added to support order stuff
+def get_jwt(request: Request) -> str:
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing auth token")
+    return auth_header.split(" ")[1]
+
+def get_user(token: str):
+    user_res = supabase.auth.get_user(token)
+    if user_res.user is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return user_res.user
 
 
 # ******************** ROUTES *******************************
@@ -162,11 +174,48 @@ def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depend
     result = sb.table("order_items").insert({"order_id": order_id, "book_id": book.id, "quantity": cartData.quantity}).execute()
     return result
 
+#@app.get("/orders")
+#def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+#    # Same deal as /cart now, information is filtered through RLS on supabase. Employees should see all while customers only see orders tied to their user_id
+#    result = sb.table("orders").select("*").execute()
+#    return result.data or []
+#commented out above get /orders to test updated get orders below. flip them as needed
 @app.get("/orders")
-def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    # Same deal as /cart now, information is filtered through RLS on supabase. Employees should see all while customers only see orders tied to their user_id
-    result = sb.table("orders").select("*").execute()
-    return result.data or []
+async def get_orders(customer_id: Optional[str] = None, request: Request = None):
+    token = get_jwt(request)
+    user = get_user(token)
+    role = user.user_metadata.get("role")
+
+    query = supabase.table("orders").select(
+        """
+        id,
+        order_number,
+        customer_id,
+        status,
+        created_at,
+        order_items (
+            quantity,
+            unit_price,
+            book_id,
+            books (
+                title
+            )
+        )
+        """
+    )
+
+    if customer_id:
+        if user.id != customer_id and role != "employee":
+            raise HTTPException(status_code=403, detail="Forbidden")
+        query = query.eq("customer_id", customer_id)
+    else:
+        if role != "employee":
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    res = query.execute()
+    if getattr(res, "status_code", 200) != 200:
+        raise HTTPException(status_code=500, detail=f"Supabase request failed with {getattr(res, 'status_code', 'unknown')}")
+    return res.data
 
 
 @app.post("/orders")
