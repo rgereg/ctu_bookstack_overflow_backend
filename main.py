@@ -225,7 +225,7 @@ def update_order(order_id: str, order_update: OrderUpdate, user=Depends(get_curr
     if not result.data:
         raise HTTPException(status_code=404, detail="Order not found")
     return result.data[0]
-
+''' THIS COMMENTED OUT SECTION WORKS, BELOW I TRY TO EXPAND IT INTO MEANINGFUL INFORMATION
 @app.get("/sales/last30days")
 def sales_last_30_days(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     if not user or not getattr(user, "user_metadata", None):
@@ -245,6 +245,44 @@ def sales_last_30_days(user=Depends(get_current_user), sb=Depends(get_supabase_a
     )
 
     return result.data or []
+'''
+@app.get("/sales/last30days")
+def sales_last_30_days(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    if not user or not getattr(user, "user_metadata", None):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    role = user.user_metadata.get("role", "customer")
+    if role != "employee":
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    thirty_days_ago = (datetime.utcnow() - timedelta(days=30)).isoformat()
+
+    result = (
+        sb.table("order_items")
+        .select("""
+            quantity,
+            unit_price,
+            created_at,
+            orders!inner(status, customer_id),
+            books!inner(title)
+        """)
+        .gte("created_at", thirty_days_ago)
+        .execute()
+    )
+
+    rows = []
+    for item in result.data or []:
+        rows.append({
+            "created_at": item.get("created_at"),
+            "book_title": item.get("books", {}).get("title", "N/A"),
+            "quantity": item.get("quantity", 0),
+            "unit_price": item.get("unit_price", 0),
+            "status": item.get("orders", {}).get("status", "N/A"),
+            "customer_id": item.get("orders", {}).get("customer_id", "N/A")
+        })
+
+    return rows
+
 
 # Updates the price and quantity of an existing book identified by ISBN.
 # Access is restricted to authenticated users with the 'employee' role.
