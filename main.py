@@ -186,7 +186,7 @@ async def get_orders(customer_id: Optional[str] = None, request: Request = None)
     user = get_user(token)
     role = user.user_metadata.get("role")
 
-    query = supabase.table("orders").select(
+    query = sb.table("orders").select(
         """
         id,
         order_number,
