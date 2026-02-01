@@ -121,12 +121,12 @@ def get_books():
 
 @app.post("/books")
 # Putting this function back for now, noticed that render docs showed it being connected to get cart with everything commented out
-def add_book(book: Book, user=Depends(get_current_user)):
+def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase_authed):
     role = user.get("user_metadata", {}).get("role")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
-    result = supabase.table("books").insert(book.dict()).execute()
-    return result.data[0]
+    result = sb.table("books").insert(book.dict()).execute()
+    return result.data or []
 
 # Adding a specific get function for carts, requesting them based on the user ID
 @app.get("/cart")
