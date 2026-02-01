@@ -136,9 +136,9 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on customer's user_id
-    # Still will need to filter based on pending orders or some other method when multiple orders from a user exist
-    # Going to try to implement the same rules for the order page with an exception for employees to see all -Tommy
-    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").execute()
+    # New problem has come up with having multiple orders present in the supabase, going to try to filter by type cart
+    # Going to keep testing to see what exactly trips CORS error
+    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").eq("orders.type", "cart").execute()
     return result.data or []
 
 @app.get("/orders")
