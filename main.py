@@ -181,7 +181,8 @@ def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depend
 #    return result.data or []
 #commented out above get /orders to test updated get orders below. flip them as needed
 @app.get("/orders")
-async def get_orders(customer_id: Optional[str] = None, request: Request = None):
+#get_orders(customer_id: Optional[str] = None, request: Request = None):
+async def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     token = get_jwt(request)
     user = get_user(token)
     role = user.user_metadata.get("role")
