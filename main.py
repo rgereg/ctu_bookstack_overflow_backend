@@ -121,7 +121,7 @@ def get_books():
 
 @app.post("/books")
 # Putting this function back for now, noticed that render docs showed it being connected to get cart with everything commented out
-def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase_authed):
+def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     role = user.get("user_metadata", {}).get("role")
     if role != "employee":
         raise HTTPException(status_code=403, detail="Forbidden")
