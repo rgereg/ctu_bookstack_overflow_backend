@@ -278,6 +278,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         return []
     elif len(cartOrderRow.data) > 1:
         raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
+        return []
     else:
         cartOrderId = cartOrderRow.data.id
     
