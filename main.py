@@ -139,18 +139,41 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
 #cart
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    """Return current user's cart items with book info"""
+    """Return current user's cart items with book info (simplified)"""
     user_id = user.id
 
-    query = (
-        sb.table("order_items")
-        .select("id, quantity, unit_price, book_id, books(id,title,price,image_path)")
-        .eq("orders.customer_id", user_id)
-        .eq("orders.type", "cart")
+    cart_order = (
+        sb.table("orders")
+        .select("id")
+        .eq("customer_id", user_id)
+        .eq("type", "cart")
+        .single()
         .execute()
+        .data
     )
 
-    return query.data or []
+    if not cart_order:
+        return []
+
+    order_id = cart_order["id"]
+
+    items = sb.table("order_items") \
+        .select("id, quantity, unit_price, book_id") \
+        .eq("order_id", order_id) \
+        .execute().data
+
+    if not items:
+        return []
+
+    book_ids = [item["book_id"] for item in items]
+    books = sb.table("books").select("id,title,price,image_path").in_("id", book_ids).execute().data
+    books_dict = {b["id"]: b for b in books}
+
+    for item in items:
+        item["books"] = books_dict.get(item["book_id"], None)
+
+    return items
+
 
 @app.post("/cart")
 def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
