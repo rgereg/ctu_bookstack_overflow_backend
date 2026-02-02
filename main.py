@@ -280,7 +280,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
         return []
     else:
-        cartOrderId = cartOrderRow.data.id
+        cartOrderId = cartOrderRow.data.get("id")
     
     # If the cart is present in the orders table, select all order items and connected books
     items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrderId).execute()
