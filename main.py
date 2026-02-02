@@ -308,6 +308,28 @@ def update_book(
         "book": result.data[0]
     }
 
+@app.post("/checkout")
+def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    cart = (
+        sb.table("orders")
+        .select("id")
+        .eq("type", "cart")
+        .eq("customer_id", user.id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not cart.data:
+        raise HTTPException(status_code=400, detail="No active cart")
+
+    order_id = cart.data["id"]
+    sb.table("orders").update({
+        "type": "order",
+        "status": "pending"
+    }).eq("id", order_id).execute()
+
+    return {"order_id": order_id}
+
 # TEMPORARY DEBUG ROUTES
 # uses the same authed client AS ABOVE and does a SELECT by ISBN.
 @app.get("/debug/books/{isbn}")
