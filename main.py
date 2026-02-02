@@ -177,79 +177,91 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 
 @app.post("/cart")
 def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    """Add a book to the user's cart"""
     user_id = user.id
 
-    cart_order = (
-        sb.table("orders")
-        .select("id")
-        .eq("customer_id", user_id)
-        .eq("type", "cart")
-        .single()
+    cart_order_resp = sb.table("orders") \
+        .select("id") \
+        .eq("customer_id", user_id) \
+        .eq("type", "cart") \
+        .single() \
         .execute()
-        .data
-    )
 
+    cart_order = cart_order_resp.data
     if not cart_order:
-        new_cart = sb.table("orders").insert({
-            "customer_id": user_id,
-            "status": "pending",
-            "type": "cart"
-        }).execute()
-        order_id = new_cart.data[0]["id"]
-    else:
-        order_id = cart_order["id"]
+        cart_order = sb.table("orders") \
+            .insert({"customer_id": user_id, "type": "cart", "status": "pending"}) \
+            .execute().data[0]
 
-    book = sb.table("books").select("id, price").eq("isbn", cartData.isbn).single().execute().data
+    order_id = cart_order["id"]
+
+    book_resp = sb.table("books").select("id, price").eq("isbn", cartData.isbn).single().execute()
+    book = book_resp.data
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    res = sb.table("order_items").insert({
-        "order_id": order_id,
-        "book_id": book["id"],
-        "quantity": cartData.quantity,
-        "unit_price": book["price"]
-    }).execute()
+    existing_item_resp = sb.table("order_items") \
+        .select("id, quantity") \
+        .eq("order_id", order_id) \
+        .eq("book_id", book["id"]) \
+        .single() \
+        .execute()
 
-    return res.data
+    if existing_item_resp.data:
+        sb.table("order_items") \
+            .update({"quantity": existing_item_resp.data["quantity"] + cartData.quantity}) \
+            .eq("id", existing_item_resp.data["id"]) \
+            .execute()
+    else:
+        sb.table("order_items").insert({
+            "order_id": order_id,
+            "book_id": book["id"],
+            "quantity": cartData.quantity,
+            "unit_price": book["price"]
+        }).execute()
+
+    return {"status": "success", "message": "Item added to cart"}
+
     
 #checkout
 @app.post("/checkout")
 def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    """Turn all cart items into an order and clear the cart"""
     user_id = user.id
 
-    cart_items = sb.table("order_items") \
-        .select("id, book_id, quantity, unit_price") \
-        .eq("orders.customer_id", user_id) \
-        .eq("orders.type", "cart") \
-        .execute().data
+    cart_order_resp = sb.table("orders") \
+        .select("id") \
+        .eq("customer_id", user_id) \
+        .eq("type", "cart") \
+        .single() \
+        .execute()
 
-    if not cart_items:
+    cart_order = cart_order_resp.data
+    if not cart_order:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
-    new_order = sb.table("orders").insert({
-        "customer_id": user_id,
-        "status": "pending",
-        "type": "order"
-    }).execute().data
+    order_id = cart_order["id"]
 
-    order_id = new_order[0]["id"]
+    items_resp = sb.table("order_items") \
+        .select("id, book_id, quantity, unit_price") \
+        .eq("order_id", order_id) \
+        .execute()
+    items = items_resp.data
 
-    order_items = []
-    for item in cart_items:
-        order_items.append({
-            "order_id": order_id,
-            "book_id": item["book_id"],
-            "quantity": item["quantity"],
-            "unit_price": item["unit_price"]
-        })
-    sb.table("order_items").insert(order_items).execute()
+    if not items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
 
-    cart_ids = [item["id"] for item in cart_items]
-    sb.table("order_items").delete().in_("id", cart_ids).execute()
+    for item in items:
+        book_resp = sb.table("books").select("id, quantity").eq("id", item["book_id"]).single().execute()
+        book = book_resp.data
+        if not book:
+            raise HTTPException(status_code=404, detail=f"Book id {item['book_id']} not found")
+        if book["quantity"] < item["quantity"]:
+            raise HTTPException(status_code=400, detail=f"Not enough stock for book id {item['book_id']}")
+        sb.table("books").update({"quantity": book["quantity"] - item["quantity"]}).eq("id", book["id"]).execute()
 
-    return {"order_id": order_id, "message": "Checkout successful"}
+    sb.table("orders").update({"type": "order", "status": "pending"}).eq("id", order_id).execute()
+
+    return {"status": "success", "order_id": order_id, "message": "Order placed successfully"}
+
 
 
 ''' commented code works but is most basic, testing upgrades above
