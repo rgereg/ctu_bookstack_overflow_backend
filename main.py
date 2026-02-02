@@ -268,11 +268,18 @@ commented code works but is most basic, testing upgrades above
 
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    # Line below this can call all information from other tables, for some reason the orders table often returns as null
-    # items = sb.table("order_items").select("*, orders(*), books(*)").eq("orders.type", "cart").execute()
-    # Below attempts to search the orders table first to find cart order ids, and then pulls all order_items and books data
-    cartOrders = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute()
-    items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrders.data["id"]).execute()
+    # Finds the current row if a cart order is present
+    cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute().data["id"]
+
+    # If no cart is present in the table for the current user, return an empty list 
+    if not cartOrderRow:
+        return []
+    
+    # If the cart is present in the orders table, get the order id and call all order items and connected book information for front end
+    cartOrderId = cartOrderRow.data["id"] 
+    items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrderId).execute()
+
+    # Return resulting rows or empty list if no items are in cart table
     return items.data or []
 
 
