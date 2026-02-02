@@ -268,7 +268,8 @@ commented code works but is most basic, testing upgrades above
 
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    items = sb.table("order_items").select("*").execute()
+    # More attempts to filter only cart items
+    items = sb.table("order_items").select("*, orders(*)").eq("orders.type", "cart").execute()
     return items.data or []
 
 
