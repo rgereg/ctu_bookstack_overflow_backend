@@ -139,9 +139,9 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
 # Adding a specific get function for carts, requesting them based on the user ID
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    # Rules to control what order information is returned are now in supabase, selecting all will filter all information based on customer's user_id
-    # RLS was returning all orders for cart, messing with policies again
-    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").eq("orders(type)", "cart").execute()
+    # Adding another select to identify the cart order_id first.
+    cartOrder = sb.table("orders").select("id").eq("type", "cart").execute()
+    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").eq("order_id", cartOrder.id).execute()
     return result.data or []
 
 # Adding items to cart
