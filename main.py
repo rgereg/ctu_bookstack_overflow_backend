@@ -209,47 +209,48 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 
 @app.post("/cart")
 def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    cart = (
+    user_id = user["id"]
+    cart_res = (
         sb.table("orders")
         .select("id")
         .eq("type", "cart")
-        .eq("customer_id", user.id)
-        .maybe_single()
+        .eq("customer_id", user_id)
         .execute()
     )
 
-    if not cart.data:
+    if not cart_res.data:
         created = (
             sb.table("orders")
             .insert({
-                "customer_id": user.id,
-                "status": "cart",
-                "type": "cart"
+                "customer_id": user_id,
+                "type": "cart",
+                "status": "cart"
             })
             .execute()
         )
         order_id = created.data[0]["id"]
     else:
-        order_id = cart.data["id"]
+        order_id = cart_res.data[0]["id"]
 
-    book = (
+    book_res = (
         sb.table("books")
         .select("id")
         .eq("isbn", cartData.isbn)
-        .maybe_single()
         .execute()
     )
 
-    if not book.data:
+    if not book_res.data:
         raise HTTPException(status_code=404, detail="Book not found")
 
+    book_id = book_res.data[0]["id"]
     sb.table("order_items").insert({
         "order_id": order_id,
-        "book_id": book.data["id"],
+        "book_id": book_id,
         "quantity": cartData.quantity
     }).execute()
 
     return {"status": "added"}
+
 
 
 @app.get("/orders")
