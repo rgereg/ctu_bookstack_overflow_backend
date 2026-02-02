@@ -269,14 +269,14 @@ commented code works but is most basic, testing upgrades above
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Finds the current row if a cart order is present
-    cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute()
+    cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
 
     # If no cart is present in the table for the current user, return an empty list 
     if not cartOrderRow:
         return []
     
     # If the cart is present in the orders table, get the order id and call all order items and connected book information for front end
-    cartOrderId = cartOrderRow.data["id"] 
+    cartOrderId = cartOrderRow.single().data["id"]
     items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrderId).execute()
 
     # Return resulting rows or empty list if no items are in cart table
