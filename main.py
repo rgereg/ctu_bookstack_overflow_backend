@@ -305,19 +305,19 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     else:
         cartOrderId = cartOrderRow[0]["id"]
     
-    # Get row for book with matching ISBN and assign id to bookId
-    bookRow = sb.table("books").select("id").eq("isbn", cartData.isbn).execute()
+    # Get row for book with matching ISBN and assign id and price to variables
+    bookRow = sb.table("books").select("*").eq("isbn", cartData.isbn).execute()
     bookId = bookRow[0]["id"]
+    bookPrice = bookRow[0]["price"]
 
-    # Check if book is already present in order, if it is adjust quantity to add to current order quantity
+    # Check if book is already present in order, if it is adjust quantity to add to current order quantity, if not insert row to order items
     checkBook = sb.table("order_items").select("*").eq("book_id", bookId).execute()
     if len(checkBook) != 0:
-        quantity = cartData.quantity + checkBook[0]["quantity"]
+        newQuantity = cartData.quantity + checkBook[0]["quantity"]
+        sb.table("order_items").update({"quantity": newQuantity}).eq("order_id", cartOrderId).eq("book_id", bookId)
     else:
-        quantity = cartData.quantity
+        sb.table("order_items").insert({"order_id": cartOrderId, "book_id": bookId, "quantity": cartData.quantity, "unit_price": bookPrice})
     
-    # Upsert row to cart order
-    sb.table("order_items").upsert({"book_id": bookId, "quantity": quantity}).execute()
     return {"status": "Book added to cart"}
 
     ''' Pushing old function down, above will follow the method for finding cart order id from get_cart
