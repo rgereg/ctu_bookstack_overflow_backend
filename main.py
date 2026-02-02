@@ -77,6 +77,10 @@ class BookUpdate(BaseModel):
     price: float
     quantity: int
 
+class CheckoutInstant(BaseModel):
+    book: Book
+    quantity: int
+
 
 
 #def get_current_user(authorization: Optional[str] = Header(None)):
@@ -118,6 +122,53 @@ def get_supabase_authed(credentials: HTTPAuthorizationCredentials = Security(sec
 
 
 # ******************** ROUTES *******************************
+@app.post("/checkout-instant")
+def checkout_instant(
+    data: CheckoutInstant,
+    user=Depends(get_current_user),
+    sb=Depends(get_supabase_authed)
+):
+    existing = (
+        sb.table("books")
+        .select("id")
+        .eq("isbn", data.book.isbn)
+        .execute()
+    )
+
+    if existing.data:
+        book_id = existing.data[0]["id"]
+    else:
+        inserted = sb.table("books").insert({
+            "title": data.book.title,
+            "author": data.book.author,
+            "isbn": data.book.isbn,
+            "description": data.book.description,
+            "price": data.book.price,
+            "quantity": data.book.quantity
+        }).execute()
+
+        book_id = inserted.data[0]["id"]
+
+    orderRow = sb.table("orders").insert({
+        "customer_id": user.id,
+        "type": "order",
+        "status": "pending"
+    }).execute()
+
+    order_id = orderRow.data[0]["id"]
+
+    sb.table("order_items").insert({
+        "order_id": order_id,
+        "book_id": book_id,
+        "quantity": data.quantity,
+        "unit_price": data.book.price
+    }).execute()
+
+    return {
+        "status": "success",
+        "order_id": order_id
+    }
+
 @app.get("/books")
 def get_books():
     result = supabase.table("books").select("*").order("title", desc=False).execute()
