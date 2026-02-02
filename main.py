@@ -311,7 +311,7 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     bookPrice = bookRow.data[0]["price"]
 
     # Check if book is already present in order, if it is adjust quantity to add to current order quantity, if not insert row to order items
-    checkBook = sb.table("order_items").select("*").eq("book_id", bookId).execute()
+    checkBook = sb.table("order_items").select("*").eq("book_id", bookId).eq("order_id", cartOrderId).execute()
     if len(checkBook.data) != 0:
         newQuantity = cartData.quantity + checkBook.data[0]["quantity"]
         sb.table("order_items").update({"quantity": newQuantity}).eq("id", checkBook.data[0]["id"]).execute()
