@@ -137,6 +137,7 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
         raise HTTPException(status_code=500, detail=str(e))
 
 #cart
+'''
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     """Return current user's cart items with book info (simplified)"""
@@ -261,10 +262,10 @@ def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     sb.table("orders").update({"type": "order", "status": "pending"}).eq("id", order_id).execute()
 
     return {"status": "success", "order_id": order_id, "message": "Order placed successfully"}
+commented code works but is most basic, testing upgrades above
+'''
 
 
-
-''' commented code works but is most basic, testing upgrades above
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     items = sb.table("order_items").select("*").execute()
@@ -337,7 +338,8 @@ def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     }).eq("id", order_id).execute()
 
     return {"order_id": order_id}
-'''
+
+#this is a placeholder line that belongs after checkout
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
