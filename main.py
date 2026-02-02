@@ -141,7 +141,7 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Adding another select to identify the cart order_id first.
     cartOrder = sb.table("orders").select("id").eq("type", "cart").execute()
-    result = sb.from_("order_items").select("quantity, books(title, isbn, price, image_path)").eq("order_id", cartOrder.id).execute()
+    result = sb.from_("order_items").select("order_id, quantity, books(title, isbn, price, image_path)").eq("order_id", cartOrder.id).execute()
     return result.data or []
 
 # Adding items to cart
