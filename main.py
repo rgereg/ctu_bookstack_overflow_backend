@@ -272,7 +272,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
 
     # If no cart is present in the table for the current user, return an empty list 
-    if not cartOrderRow:
+    if len(cartOrderRow.data == 0):
         return []
     
     # If the cart is present in the orders table, get the order id and call all order items and connected book information for front end
