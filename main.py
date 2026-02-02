@@ -162,7 +162,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 
     items = (
         sb.table("order_items")
-        .select("id, book_id, quantity")
+        .select("book_id, quantity")
         .eq("order_id", order_id)
         .execute()
         .data
