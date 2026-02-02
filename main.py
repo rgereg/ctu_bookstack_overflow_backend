@@ -277,9 +277,9 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     if len(cartOrderRow.data) == 0:
         return []
     elif len(cartOrderRow.data) > 1:
-        cartOrderId = cartOrderRow.single().data["id"]
+        cartOrderId = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute().data["id"]
     else:
-        cartOrderId = cartOrderRow.data["id"]
+        cartOrderId = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute().data["id"]
     
     # If the cart is present in the orders table, select all order items and connected books
     items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrderId).execute()
