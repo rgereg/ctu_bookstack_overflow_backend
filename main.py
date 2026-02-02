@@ -272,12 +272,16 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Finds the current row if a cart order is present
     cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
 
-    # If no cart is present in the table for the current user, return an empty list
+    # Check number of rows returned for cart orders, if no cart is present in the table for the current user, return an empty list
+    # If multiple are present, select a single row. Shouldn't be necessary but just to be safe since errors occured depending on list length with .single()
     if len(cartOrderRow.data) == 0:
         return []
+    elif len(cartOrderRow.data) > 1:
+        cartOrderId = cartOrderRow.single().data["id"]
+    else:
+        cartOrderId = cartOrderRow.data["id"]
     
-    # If the cart is present in the orders table, get the order id and call all order items and connected book information for front end
-    cartOrderId = cartOrderRow.single().data["id"]
+    # If the cart is present in the orders table, select all order items and connected books
     items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrderId).execute()
 
     # Return resulting rows or empty list if no items are in cart table
