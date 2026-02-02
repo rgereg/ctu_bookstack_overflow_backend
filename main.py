@@ -291,7 +291,37 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 
 @app.post("/cart")
 def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    user_id = user["id"]
+    # Select row for cart order id
+    cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
+
+    # Check number of rows returned, create a cart order if none connected to customer and throw error if multiple are present
+    # Assign cartOrderId as order id
+    if len(cartOrderRow.data) == 0:
+        newOrderRow = sb.table("orders").insert({"customer_id": user.id, "type": "cart", "status": "pending"}).execute()
+        cartOrderId = newOrderRow.data[0]["id"]
+    elif len(cartOrderRow.data) > 1:
+        raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
+        return []
+    else:
+        cartOrderId = cartOrderRow[0]["id"]
+    
+    # Get row for book with matching ISBN and assign id to bookId
+    bookRow = sb.table("books").select("id").eq("isbn", cartData.isbn).execute()
+    bookId = bookRow[0]["id"]
+
+    # Check if book is already present in order, if it is adjust quantity to add to current order quantity
+    checkBook = sb.table("order_items").select("*").eq("book_id", bookId).execute()
+    if len(checkBook) != 0:
+        quantity = cartData.quantity + checkBook[0]["quantity"]
+    else:
+        quantity = cartData.quantity
+    
+    # Upsert row to cart order
+    sb.table("order_items").upsert({"book_id": bookId, "quantity": quantity}).execute()
+    return {"status": "Book added to cart"}
+
+    ''' Pushing old function down, above will follow the method for finding cart order id from get_cart
+    user_id = user.id
     cart_res = (
         sb.table("orders")
         .select("id")
@@ -331,7 +361,7 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
         "quantity": cartData.quantity
     }).execute()
 
-    return {"status": "added"}
+    return {"status": "added"}'''
 
 
 @app.post("/checkout")
