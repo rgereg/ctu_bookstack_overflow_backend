@@ -136,36 +136,105 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
         print(f"Error in add_book: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Adding a specific get function for carts, requesting them based on the user ID
-#@app.get("/cart")
-#def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    # Adding another select to identify the cart order_id first.
- #   cartOrder = sb.table("orders").select("*").eq("type", "cart").execute()
- #   result = sb.from_("order_items").select("order_id, quantity, books(title, isbn, price, image_path)").eq("order_id", cartOrder.id).execute()
- #   return result.data or []
+#cart
+@app.get("/cart")
+def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    """Return current user's cart items with book info"""
+    user_id = user.id
 
+    query = (
+        sb.table("order_items")
+        .select("id, quantity, unit_price, book_id, books(id,title,price,image_path)")
+        .eq("orders.customer_id", user_id)
+        .eq("orders.type", "cart")
+        .execute()
+    )
+
+    return query.data or []
+
+@app.post("/cart")
+def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    """Add a book to the user's cart"""
+    user_id = user.id
+
+    cart_order = (
+        sb.table("orders")
+        .select("id")
+        .eq("customer_id", user_id)
+        .eq("type", "cart")
+        .single()
+        .execute()
+        .data
+    )
+
+    if not cart_order:
+        new_cart = sb.table("orders").insert({
+            "customer_id": user_id,
+            "status": "pending",
+            "type": "cart"
+        }).execute()
+        order_id = new_cart.data[0]["id"]
+    else:
+        order_id = cart_order["id"]
+
+    book = sb.table("books").select("id, price").eq("isbn", cartData.isbn).single().execute().data
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    res = sb.table("order_items").insert({
+        "order_id": order_id,
+        "book_id": book["id"],
+        "quantity": cartData.quantity,
+        "unit_price": book["price"]
+    }).execute()
+
+    return res.data
+    
+#checkout
+@app.post("/checkout")
+def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    """Turn all cart items into an order and clear the cart"""
+    user_id = user.id
+
+    cart_items = sb.table("order_items") \
+        .select("id, book_id, quantity, unit_price") \
+        .eq("orders.customer_id", user_id) \
+        .eq("orders.type", "cart") \
+        .execute().data
+
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    new_order = sb.table("orders").insert({
+        "customer_id": user_id,
+        "status": "pending",
+        "type": "order"
+    }).execute().data
+
+    order_id = new_order[0]["id"]
+
+    order_items = []
+    for item in cart_items:
+        order_items.append({
+            "order_id": order_id,
+            "book_id": item["book_id"],
+            "quantity": item["quantity"],
+            "unit_price": item["unit_price"]
+        })
+    sb.table("order_items").insert(order_items).execute()
+
+    cart_ids = [item["id"] for item in cart_items]
+    sb.table("order_items").delete().in_("id", cart_ids).execute()
+
+    return {"order_id": order_id, "message": "Checkout successful"}
+
+
+''' commented code works but is most basic, testing upgrades above
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     items = sb.table("order_items").select("*").execute()
     return items.data or []
 
-# Adding items to cart
-#@app.post("/cart")
-#def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depends(get_supabase_authed)):
-    # Check if customer already has a cart started
-#    cartCheck = sb.table("orders").select("id").eq("type", "cart").execute()
-
-    # If not, create a cart order to begin adding to
-#    if not cartCheck:
-#        insertData = sb.table("orders").insert({"status": "pending", "type": "cart"}).execute()
-#        order_id = insertData.id
-#    else:
-#        order_id = cartCheck.id
-    
-    # Find book by isbn and insert book id and amount to the order items table under order id
-#    book = sb.table("books").select("id").eq("isbn", cartData.isbn).execute()
-#    result = sb.table("order_items").insert({"order_id": order_id, "book_id": book.id, "quantity": cartData.quantity}).execute()
-#    return result
 
 @app.post("/cart")
 def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
@@ -212,6 +281,28 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     return {"status": "added"}
 
 
+@app.post("/checkout")
+def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    cart = (
+        sb.table("orders")
+        .select("id")
+        .eq("type", "cart")
+        .eq("customer_id", user.id)
+        .maybe_single()
+        .execute()
+    )
+
+    if not cart.data:
+        raise HTTPException(status_code=400, detail="No active cart")
+
+    order_id = cart.data["id"]
+    sb.table("orders").update({
+        "type": "order",
+        "status": "pending"
+    }).eq("id", order_id).execute()
+
+    return {"order_id": order_id}
+'''
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
@@ -359,27 +450,7 @@ def update_book(
         "book": result.data[0]
     }
 
-@app.post("/checkout")
-def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    cart = (
-        sb.table("orders")
-        .select("id")
-        .eq("type", "cart")
-        .eq("customer_id", user.id)
-        .maybe_single()
-        .execute()
-    )
 
-    if not cart.data:
-        raise HTTPException(status_code=400, detail="No active cart")
-
-    order_id = cart.data["id"]
-    sb.table("orders").update({
-        "type": "order",
-        "status": "pending"
-    }).eq("id", order_id).execute()
-
-    return {"order_id": order_id}
 
 # TEMPORARY DEBUG ROUTES
 # uses the same authed client AS ABOVE and does a SELECT by ISBN.
