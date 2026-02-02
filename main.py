@@ -269,7 +269,7 @@ commented code works but is most basic, testing upgrades above
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Finds the current row if a cart order is present
-    cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute().data["id"]
+    cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute()
 
     # If no cart is present in the table for the current user, return an empty list 
     if not cartOrderRow:
