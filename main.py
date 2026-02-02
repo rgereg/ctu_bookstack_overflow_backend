@@ -277,7 +277,8 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     if len(cartOrderRow.data) == 0:
         return []
     elif len(cartOrderRow.data) > 1:
-        cartOrderId = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute().data[0]
+        cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").single().execute() 
+        cartOrderId = cartOrderRow.data.id
     else:
         cartOrderId = cartOrderRow.data[0]
     
