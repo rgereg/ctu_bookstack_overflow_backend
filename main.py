@@ -272,15 +272,15 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Finds the current row if a cart order is present
     cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
 
-    # Check number of rows returned for cart orders, if no cart is present in the table for the current user, return an empty list
-    # If multiple are present, throw an exception
+    # Check number of rows returned for cart orders, if no cart or multiple carts present in the table for the current user, return an empty list
     if len(cartOrderRow.data) == 0:
         return []
     elif len(cartOrderRow.data) > 1:
         raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
         return []
     else:
-        cartOrderId = cartOrderRow.data.get("id")
+        cartOrderData = cartOrderRow.data
+        cartOrderId = cartOrderData.id
     
     # If the cart is present in the orders table, select all order items and connected books
     items = sb.table("order_items").select("*, books(*)").eq("order_id", cartOrderId).execute()
