@@ -187,6 +187,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         for item in items
     ]
 
+
 # Adding items to cart
 #@app.post("/cart")
 #def add_to_cart(cartData: CartAdd, user = Depends(get_current_user), sb = Depends(get_supabase_authed)):
