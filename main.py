@@ -303,7 +303,7 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
         raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
         return []
     else:
-        cartOrderId = cartOrderRow[0]["id"]
+        cartOrderId = cartOrderRow.data[0]["id"]
     
     # Get row for book with matching ISBN and assign id and price to variables
     bookRow = sb.table("books").select("*").eq("isbn", cartData.isbn).execute()
