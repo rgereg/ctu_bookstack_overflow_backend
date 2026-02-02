@@ -314,7 +314,7 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     checkBook = sb.table("order_items").select("*").eq("book_id", bookId).execute()
     if len(checkBook.data) != 0:
         newQuantity = cartData.quantity + checkBook.data[0]["quantity"]
-        sb.table("order_items").update({"quantity": newQuantity}).eq("order_id", cartOrderId).eq("book_id", bookId).execute()
+        sb.table("order_items").update({"quantity": newQuantity}).eq("id", checkBook.data[0]["id"]).execute()
     else:
         sb.table("order_items").insert({"order_id": cartOrderId, "book_id": bookId, "quantity": cartData.quantity, "unit_price": bookPrice}).execute()
     
