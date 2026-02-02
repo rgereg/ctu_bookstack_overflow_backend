@@ -279,7 +279,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
         return []
     else:
-        # Supabase responses return a dictionary per row inside of a list, have to reference list index then column to get it from response
+        # Supabase responses .data return a dictionary per row inside of a list, have to reference list index then column to get it from response
         cartOrderId = cartOrderRow.data[0]["id"]
     
     # If the cart is present in the orders table, select all order items and connected books
@@ -307,13 +307,13 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     
     # Get row for book with matching ISBN and assign id and price to variables
     bookRow = sb.table("books").select("*").eq("isbn", cartData.isbn).execute()
-    bookId = bookRow[0]["id"]
-    bookPrice = bookRow[0]["price"]
+    bookId = bookRow.data[0]["id"]
+    bookPrice = bookRow.data[0]["price"]
 
     # Check if book is already present in order, if it is adjust quantity to add to current order quantity, if not insert row to order items
     checkBook = sb.table("order_items").select("*").eq("book_id", bookId).execute()
-    if len(checkBook) != 0:
-        newQuantity = cartData.quantity + checkBook[0]["quantity"]
+    if len(checkBook.data) != 0:
+        newQuantity = cartData.quantity + checkBook.data[0]["quantity"]
         sb.table("order_items").update({"quantity": newQuantity}).eq("order_id", cartOrderId).eq("book_id", bookId)
     else:
         sb.table("order_items").insert({"order_id": cartOrderId, "book_id": bookId, "quantity": cartData.quantity, "unit_price": bookPrice})
