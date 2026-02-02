@@ -265,13 +265,14 @@ def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
 commented code works but is most basic, testing upgrades above
 '''
 
-
+# get_cart function as it is below works for any customer with or without a cart order in database and now filters correctly if the order type is cart
+# Also returns all data from books with book ids in the order items, can be referenced on front end using 'data.books.column'
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Finds the current row if a cart order is present
     cartOrderRow = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
 
-    # If no cart is present in the table for the current user, return an empty list 
+    # If no cart is present in the table for the current user, return an empty list
     if len(cartOrderRow.data) == 0:
         return []
     
