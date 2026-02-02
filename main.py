@@ -279,6 +279,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         raise HTTPException(status_code = 400, detail = "More than one cart connected to user")
         return []
     else:
+        # Supabase responses return a dictionary per row inside of a list, have to reference list index then column to get it from response
         cartOrderId = cartOrderRow.data[0]["id"]
     
     # If the cart is present in the orders table, select all order items and connected books
