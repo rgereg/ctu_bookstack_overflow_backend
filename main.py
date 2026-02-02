@@ -307,6 +307,7 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     
     # Get row for book with matching ISBN and assign id and price to variables
     bookRow = sb.table("books").select("*").eq("isbn", cartData.isbn).execute()
+    print(len(bookRow.data))
     bookId = bookRow.data[0]["id"]
     bookPrice = bookRow.data[0]["price"]
 
