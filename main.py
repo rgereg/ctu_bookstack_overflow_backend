@@ -280,7 +280,10 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
         raise HTTPException(status_code=400, detail="No active cart")
     cart_id = cart_resp.data[0]["id"]
 
-    item_resp = sb.table("order_items").select("*").eq("order_id", cart_id).eq("book_id", update.isbn).execute()
+    # Old call was using isbn as the book id instead of the uuid supabase made, getting the book_id first now
+    bookRow = sb.table("books").select("id").eq("isbn", update.isbn).execute()
+    bookId = bookRow[0]["id"]
+    item_resp = sb.table("order_items").select("*").eq("order_id", cart_id).eq("book_id", bookId).execute()
     if not item_resp.data:
         raise HTTPException(status_code=404, detail="Item not in cart")
     
