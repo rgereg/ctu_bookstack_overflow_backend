@@ -271,7 +271,7 @@ def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Line below this can call all information from other tables, for some reason the orders table often returns as null
     # items = sb.table("order_items").select("*, orders(*), books(*)").eq("orders.type", "cart").execute()
     # Below attempts to search the orders table first to find cart order ids, and then pulls all order_items and books data
-    cartOrders = sb.table("orders").select("*").eq("type", "cart").execute()
+    cartOrders = sb.table("orders").select("*").eq("type", "cart").single().execute()
     items = sb.table("order_items").select("*, books(*), orders(*)").eq("order_id", cartOrders.id).execute()
     return items.data or []
 
