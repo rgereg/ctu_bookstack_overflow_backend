@@ -146,48 +146,8 @@ def add_book(book: Book, user=Depends(get_current_user), sb=Depends(get_supabase
 
 @app.get("/cart")
 def get_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    user_id = user["id"]
-
-    cart_res = (
-        sb.table("orders")
-        .select("id")
-        .eq("type", "cart")
-        .eq("customer_id", user_id)
-        .execute()
-    )
-
-    if not cart_res.data:
-        return []
-
-    order_id = cart_res.data[0]["id"]
-
-    items = (
-        sb.table("order_items")
-        .select("book_id, quantity")
-        .eq("order_id", order_id)
-        .execute()
-        .data
-    )
-
-    if not items:
-        return []
-
-    books_res = (
-        sb.table("books")
-        .select("id,title,isbn,price,image_path")
-        .execute()
-    )
-
-    books = {b["id"]: b for b in books_res.data}
-
-    return [
-        {
-            "quantity": item["quantity"],
-            "book": books.get(item["book_id"])
-        }
-        for item in items
-    ]
-
+    items = sb.table("order_items").select("*").execute()
+    return items.data or []
 
 # Adding items to cart
 #@app.post("/cart")
