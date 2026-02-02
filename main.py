@@ -142,9 +142,10 @@ def checkout_instant(
             "title": data.book.title,
             "author": data.book.author,
             "isbn": data.book.isbn,
-            "description": data.book.description,
+            "description": data.book.description or "",
             "price": data.book.price,
-            "quantity": data.book.quantity
+            "quantity": data.book.quantity,
+            "image_path": data.book.image_path or ""
         }).execute()
 
         book_id = inserted.data[0]["id"]
