@@ -333,68 +333,68 @@ def remove_cart_item(
 
 @app.post("/checkout")
 def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    try:
-        cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
-        print("Cart response:", cart_resp.data, cart_resp.error)
-        if cart_resp.error:
-            raise HTTPException(status_code=500, detail=f"Error fetching cart: {cart_resp.error}")
-        if not cart_resp.data or len(cart_resp.data) == 0:
-            raise HTTPException(status_code=404, detail="No active cart")
-        if len(cart_resp.data) > 1:
-            raise HTTPException(status_code=400, detail="More than one cart connected to user")
-        
-        cart = cart_resp.data[0]
-        cart_id = cart["id"]
-        print(f"Using cart ID: {cart_id}")
+    cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
+    print("Cart fetch response:", cart_resp.data)
 
-        items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
-        print("Cart items response:", items_resp.data, items_resp.error)
-        if items_resp.error:
-            raise HTTPException(status_code=500, detail=f"Error fetching cart items: {items_resp.error}")
-        if not items_resp.data or len(items_resp.data) == 0:
-            raise HTTPException(status_code=400, detail="Cart is empty")
+    if cart_resp.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Error fetching cart: {cart_resp.data}")
+    
+    if not cart_resp.data or len(cart_resp.data) == 0:
+        raise HTTPException(status_code=404, detail="No active cart")
+    elif len(cart_resp.data) > 1:
+        raise HTTPException(status_code=400, detail="More than one cart connected to user")
 
-        order_payload = {"customer_id": user.id, "type": "order", "status": "pending"}
-        print("Creating new order with payload:", order_payload)
-        order_resp = sb.table("orders").insert(order_payload).execute()
-        print("Order creation response:", order_resp.data, order_resp.error)
-        if order_resp.error:
-            raise HTTPException(status_code=500, detail=f"Error creating order: {order_resp.error}")
-        if not order_resp.data or len(order_resp.data) == 0:
-            raise HTTPException(status_code=500, detail="Failed to create order")
-        order_id = order_resp.data[0]["id"]
-        print(f"Created new order ID: {order_id}")
+    cart = cart_resp.data[0]
+    cart_id = cart["id"]
 
-        for item in items_resp.data:
-            item_payload = {
-                "order_id": order_id,
-                "book_id": item["book_id"],
-                "quantity": item["quantity"],
-                "unit_price": item["unit_price"]
-            }
-            print("Inserting order item with payload:", item_payload)
-            item_resp = sb.table("order_items").insert(item_payload).execute()
-            print("Order item insert response:", item_resp.data, item_resp.error)
-            if item_resp.error:
-                raise HTTPException(status_code=500, detail=f"Error adding item {item['book_id']} to order: {item_resp.error}")
+    items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
+    print("Cart items response:", items_resp.data)
 
-        print(f"Deleting items from cart ID: {cart_id}")
-        del_resp = sb.table("order_items").delete().eq("order_id", cart_id).execute()
-        print("Deleted cart items response:", del_resp.data, del_resp.error)
-        if del_resp.error:
-            raise HTTPException(status_code=500, detail=f"Error deleting cart items: {del_resp.error}")
-        
-        print(f"Deleting cart order ID: {cart_id}")
-        cart_delete_resp = sb.table("orders").delete().eq("id", cart_id).execute()
-        print("Deleted cart order response:", cart_delete_resp.data, cart_delete_resp.error)
-        if cart_delete_resp.error:
-            raise HTTPException(status_code=500, detail=f"Error deleting cart order: {cart_delete_resp.error}")
+    if items_resp.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Error fetching cart items: {items_resp.data}")
+    
+    if not items_resp.data or len(items_resp.data) == 0:
+        raise HTTPException(status_code=400, detail="Cart is empty")
 
-        return {"status": "success", "order_id": order_id}
+    order_payload = {
+        "customer_id": user.id,
+        "type": "order",
+        "status": "pending"
+    }
+    print("Creating order with payload:", order_payload)
+    order_resp = sb.table("orders").insert(order_payload).execute()
 
-    except Exception as e:
-        print("Unexpected checkout error:", e)
-        raise HTTPException(status_code=500, detail=str(e))
+    if order_resp.status_code != 201 and order_resp.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Error creating order: {order_resp.data}")
+    
+    if not order_resp.data or len(order_resp.data) == 0:
+        raise HTTPException(status_code=500, detail="Failed to create order")
+    
+    order_id = order_resp.data[0]["id"]
+    print("Created order ID:", order_id)
+
+    for item in items_resp.data:
+        item_payload = {
+            "order_id": order_id,
+            "book_id": item["book_id"],
+            "quantity": item["quantity"],
+            "unit_price": item["unit_price"]
+        }
+        print("Adding order item with payload:", item_payload)
+        item_resp = sb.table("order_items").insert(item_payload).execute()
+
+        if item_resp.status_code != 201 and item_resp.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Error adding item to order: {item_resp.data}")
+
+    del_resp = sb.table("order_items").delete().eq("order_id", cart_id).execute()
+    if del_resp.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Error deleting cart items: {del_resp.data}")
+
+    cart_del_resp = sb.table("orders").delete().eq("id", cart_id).execute()
+    if cart_del_resp.status_code != 200:
+        raise HTTPException(status_code=500, detail=f"Error deleting cart order: {cart_del_resp.data}")
+
+    return {"status": "success", "order_id": order_id}
 
 
 @app.get("/orders")
