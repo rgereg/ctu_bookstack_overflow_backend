@@ -45,14 +45,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-#this is for debug TODO REMOVE
-@app.post("/checkout/create-order")
-def test():
-    print("HIT TEST")
-    return {"ok": True}
-#this is for debug TODO REMOVE
-
-
 class Book(BaseModel):
     title: str
     author: str
@@ -344,7 +336,7 @@ def remove_cart_item(
 
 #checkout top placeholder do not remove
 
-@app.post("/checkout/create-order/") #trailing slash test TODO REMOVE OR FIX 
+@app.post("/checkout/create-order")
 def create_order_from_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
     if not cart_resp.data or len(cart_resp.data) == 0:
