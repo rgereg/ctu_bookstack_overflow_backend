@@ -145,10 +145,8 @@ def checkout_instant(
             "isbn": data.book.isbn,
             "description": data.book.description,
             "price": data.book.price,
-            "quantity": data.book.quantity,
-            "is_featured": getattr(data.book, "is_featured", None),
-            "category": getattr(data.book, "category", None),
-            "image_path": getattr(data.book, "image_path", None)
+            "quantity": data.book.quantity#,
+            #"image_path": getattr(data.book, "image_path", None)
         }
 
         inserted = sb.table("books").insert(book_payload).execute()
