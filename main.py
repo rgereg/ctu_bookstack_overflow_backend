@@ -288,9 +288,9 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
         raise HTTPException(status_code=404, detail="Item not in cart")
     
     item = item_resp.data[0]
-    # Seeing what the response data and item are returning, giving same error as above for multiple rows matching filter for update
-    print(item_resp.data)
-    print(item)
+    # Currently running into the same issue as above, render gives the following error
+    # sb.table("order_items").update({"quantity": update.quantity}).eq("id", item["id"]).execute()
+    # postgrest.exceptions.APIError: {'code': '21000', 'details': None, 'hint': None, 'message': 'more than one row returned by a subquery used as an expression'}
     if update.quantity <= 0:
         sb.table("order_items").delete().eq("id", item["id"]).execute()
         return {"status": "removed"}
