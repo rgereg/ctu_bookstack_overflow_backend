@@ -331,14 +331,11 @@ def remove_cart_item(
 
     return {"status": "removed"}
 
-@app.post("/checkout")
-def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
-    print("Cart fetch response:", cart_resp.data)
+#checkout top placeholder do not remove
 
-    if cart_resp.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"Error fetching cart: {cart_resp.data}")
-    
+@app.post("/checkout/create-order")
+def create_order_from_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
     if not cart_resp.data or len(cart_resp.data) == 0:
         raise HTTPException(status_code=404, detail="No active cart")
     elif len(cart_resp.data) > 1:
@@ -347,55 +344,57 @@ def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart = cart_resp.data[0]
     cart_id = cart["id"]
 
-    items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
-    print("Cart items response:", items_resp.data)
-
-    if items_resp.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"Error fetching cart items: {items_resp.data}")
-    
-    if not items_resp.data or len(items_resp.data) == 0:
-        raise HTTPException(status_code=400, detail="Cart is empty")
-
-    order_payload = {
+    order_resp = sb.table("orders").insert({
         "customer_id": user.id,
         "type": "order",
         "status": "pending"
-    }
-    print("Creating order with payload:", order_payload)
-    order_resp = sb.table("orders").insert(order_payload).execute()
+    }).execute()
 
-    if order_resp.status_code != 201 and order_resp.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"Error creating order: {order_resp.data}")
-    
     if not order_resp.data or len(order_resp.data) == 0:
         raise HTTPException(status_code=500, detail="Failed to create order")
-    
+
     order_id = order_resp.data[0]["id"]
-    print("Created order ID:", order_id)
+    print(f"[DEBUG] Created order {order_id} from cart {cart_id}")
+    return {"status": "order_created", "order_id": order_id, "cart_id": cart_id}
+
+@app.post("/checkout/add-items")
+def add_cart_items_to_order(payload: dict, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    order_id = payload.get("order_id")
+    cart_id = payload.get("cart_id")
+    if not order_id or not cart_id:
+        raise HTTPException(status_code=400, detail="Missing order_id or cart_id")
+
+    items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
+    if not items_resp.data:
+        raise HTTPException(status_code=400, detail="Cart is empty")
 
     for item in items_resp.data:
-        item_payload = {
+        insert_resp = sb.table("order_items").insert({
             "order_id": order_id,
             "book_id": item["book_id"],
             "quantity": item["quantity"],
             "unit_price": item["unit_price"]
-        }
-        print("Adding order item with payload:", item_payload)
-        item_resp = sb.table("order_items").insert(item_payload).execute()
+        }).execute()
+        if insert_resp.error:
+            print(f"[DEBUG] Failed to insert item {item['id']}: {insert_resp.error}")
+            raise HTTPException(status_code=500, detail=f"Failed to add item {item['id']} to order")
 
-        if item_resp.status_code != 201 and item_resp.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Error adding item to order: {item_resp.data}")
+    print(f"[DEBUG] Added {len(items_resp.data)} items from cart {cart_id} to order {order_id}")
+    return {"status": "items_added", "order_id": order_id, "item_count": len(items_resp.data)}
 
-    del_resp = sb.table("order_items").delete().eq("order_id", cart_id).execute()
-    if del_resp.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"Error deleting cart items: {del_resp.data}")
+@app.post("/checkout/clear-cart")
+def clear_cart(payload: dict, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    cart_id = payload.get("cart_id")
+    if not cart_id:
+        raise HTTPException(status_code=400, detail="Missing cart_id")
 
-    cart_del_resp = sb.table("orders").delete().eq("id", cart_id).execute()
-    if cart_del_resp.status_code != 200:
-        raise HTTPException(status_code=500, detail=f"Error deleting cart order: {cart_del_resp.data}")
+    del_items = sb.table("order_items").delete().eq("order_id", cart_id).execute()
+    del_cart = sb.table("orders").delete().eq("id", cart_id).execute()
 
-    return {"status": "success", "order_id": order_id}
+    print(f"[DEBUG] Cleared cart {cart_id}: items_deleted={len(del_items.data) if del_items.data else 0}")
+    return {"status": "cart_cleared", "cart_id": cart_id}
 
+#checkout bottom placeholder do not remove
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
