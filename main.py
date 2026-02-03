@@ -336,6 +336,8 @@ def remove_cart_item(
 @app.post("/checkout")
 def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
+    if cart_resp.error:
+        raise HTTPException(status_code=500, detail=f"Error fetching cart: {cart_resp.error}")
     if not cart_resp.data or len(cart_resp.data) == 0:
         raise HTTPException(status_code=404, detail="No active cart")
     elif len(cart_resp.data) > 1:
@@ -345,6 +347,8 @@ def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart_id = cart["id"]
 
     items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
+    if items_resp.error:
+        raise HTTPException(status_code=500, detail=f"Error fetching cart items: {items_resp.error}")
     if not items_resp.data or len(items_resp.data) == 0:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
@@ -353,25 +357,29 @@ def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         "type": "order",
         "status": "pending"
     }).execute()
-
+    if order_resp.error:
+        raise HTTPException(status_code=500, detail=f"Error creating order: {order_resp.error}")
     if not order_resp.data or len(order_resp.data) == 0:
         raise HTTPException(status_code=500, detail="Failed to create order")
-
     order_id = order_resp.data[0]["id"]
 
     for item in items_resp.data:
-        sb.table("order_items").insert({
+        item_resp = sb.table("order_items").insert({
             "order_id": order_id,
             "book_id": item["book_id"],
             "quantity": item["quantity"],
             "unit_price": item["unit_price"]
         }).execute()
+        if item_resp.error:
+            raise HTTPException(status_code=500, detail=f"Error adding item to order: {item_resp.error}")
 
-    sb.table("order_items").delete().eq("order_id", cart_id).execute()
+    del_resp = sb.table("order_items").delete().eq("order_id", cart_id).execute()
+    if del_resp.error:
+        raise HTTPException(status_code=500, detail=f"Error deleting cart items: {del_resp.error}")
     sb.table("orders").delete().eq("id", cart_id).execute()
 
     return {"status": "success", "order_id": order_id}
-    
+
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
