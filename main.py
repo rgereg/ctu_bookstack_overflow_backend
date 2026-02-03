@@ -81,6 +81,10 @@ class CheckoutInstant(BaseModel):
     book: Book
     quantity: int
 
+class CheckoutPayload(BaseModel):
+    order_id: str
+    cart_id: str
+
 
 
 #def get_current_user(authorization: Optional[str] = Header(None)):
@@ -358,11 +362,9 @@ def create_order_from_cart(user=Depends(get_current_user), sb=Depends(get_supaba
     return {"status": "order_created", "order_id": order_id, "cart_id": cart_id}
 
 @app.post("/checkout/add-items")
-def add_cart_items_to_order(payload: dict, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    order_id = payload.get("order_id")
-    cart_id = payload.get("cart_id")
-    if not order_id or not cart_id:
-        raise HTTPException(status_code=400, detail="Missing order_id or cart_id")
+def add_cart_items_to_order(payload: CheckoutPayload, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    order_id = payload.order_id
+    cart_id = payload.cart_id
 
     items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
     if not items_resp.data:
