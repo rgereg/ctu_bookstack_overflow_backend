@@ -333,7 +333,45 @@ def remove_cart_item(
 
     return {"status": "removed"}
 
-#this is a placeholder line that belongs after checkout
+@app.post("/checkout")
+def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
+    if not cart_resp.data or len(cart_resp.data) == 0:
+        raise HTTPException(status_code=404, detail="No active cart")
+    elif len(cart_resp.data) > 1:
+        raise HTTPException(status_code=400, detail="More than one cart connected to user")
+
+    cart = cart_resp.data[0]
+    cart_id = cart["id"]
+
+    items_resp = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
+    if not items_resp.data or len(items_resp.data) == 0:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+
+    order_resp = sb.table("orders").insert({
+        "customer_id": user.id,
+        "type": "order",
+        "status": "pending"
+    }).execute()
+
+    if not order_resp.data or len(order_resp.data) == 0:
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+    order_id = order_resp.data[0]["id"]
+
+    for item in items_resp.data:
+        sb.table("order_items").insert({
+            "order_id": order_id,
+            "book_id": item["book_id"],
+            "quantity": item["quantity"],
+            "unit_price": item["unit_price"]
+        }).execute()
+
+    sb.table("order_items").delete().eq("order_id", cart_id).execute()
+    sb.table("orders").delete().eq("id", cart_id).execute()
+
+    return {"status": "success", "order_id": order_id}
+    
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
