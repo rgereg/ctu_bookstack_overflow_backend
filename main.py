@@ -272,7 +272,7 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     
     return {"status": "Book added to cart"}
 
-#cart editing
+#cart editing works now, error reference removed
 @app.patch("/cart")
 def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
@@ -280,7 +280,6 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
         raise HTTPException(status_code=400, detail="No active cart")
     cart_id = cart_resp.data[0]["id"]
 
-    # Old call was using isbn as the book id instead of the uuid supabase made, getting the book_id first now
     bookRow = sb.table("books").select("id").eq("isbn", update.isbn).execute()
     bookId = bookRow.data[0]["id"]
     item_resp = sb.table("order_items").select("*").eq("order_id", cart_id).eq("book_id", bookId).execute()
@@ -288,9 +287,6 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
         raise HTTPException(status_code=404, detail="Item not in cart")
     
     item = item_resp.data[0]
-    # Currently running into the same issue as above, render gives the following error
-    # sb.table("order_items").update({"quantity": update.quantity}).eq("id", item["id"]).execute()
-    # postgrest.exceptions.APIError: {'code': '21000', 'details': None, 'hint': None, 'message': 'more than one row returned by a subquery used as an expression'}
     if update.quantity <= 0:
         sb.table("order_items").delete().eq("id", item["id"]).execute()
         return {"status": "removed"}
@@ -300,36 +296,42 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
 
 
 @app.delete("/cart/{isbn}")
-def remove_cart_item(isbn: str, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
-    if not cart_resp.data:
-        raise HTTPException(status_code=400, detail="No active cart")
-    cart_id = cart_resp.data[0]["id"]
-
-    sb.table("order_items").delete().eq("order_id", cart_id).eq("book_id", isbn).execute()
-    return {"status": "removed"}
-
-@app.post("/checkout")
-def checkout(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    cart = (
+def remove_cart_item(
+    isbn: str,
+    user=Depends(get_current_user),
+    sb=Depends(get_supabase_authed)
+):
+    cart_resp = (
         sb.table("orders")
-        .select("id")
-        .eq("type", "cart")
+        .select("*")
         .eq("customer_id", user.id)
-        .maybe_single()
+        .eq("type", "cart")
         .execute()
     )
 
-    if not cart.data:
+    if not cart_resp.data:
         raise HTTPException(status_code=400, detail="No active cart")
 
-    order_id = cart.data["id"]
-    sb.table("orders").update({
-        "type": "order",
-        "status": "pending"
-    }).eq("id", order_id).execute()
+    cart_id = cart_resp.data[0]["id"]
 
-    return {"order_id": order_id}
+    book_resp = sb.table("books").select("id").eq("isbn", isbn).execute()
+    if not book_resp.data:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    book_id = book_resp.data[0]["id"]
+
+    delete_resp = (
+        sb.table("order_items")
+        .delete()
+        .eq("order_id", cart_id)
+        .eq("book_id", book_id)
+        .execute()
+    )
+
+    if not delete_resp.data:
+        raise HTTPException(status_code=404, detail="Item not in cart")
+
+    return {"status": "removed"}
 
 #this is a placeholder line that belongs after checkout
 
