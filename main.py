@@ -122,7 +122,7 @@ def get_current_user(
 # evaluates policies (auth.jwt()) based on the JWT attached to the database request.
 # Using the global client (anon key only) will cause updates to be silently blocked
 # by RLS and return zero rows. ~n testing removing options requests from security
-def get_supabase_authed(credentials: HTTPAuthorizationCredentials = Security(security)):
+def get_supabase_authed(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
