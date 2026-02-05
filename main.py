@@ -101,9 +101,14 @@ class CheckoutPayload(BaseModel):
 # HTTPBearer security scheme. This function verifies the token with Supabase
 # and returns the authenticated user object. It handles authentication only;
 # authorization (such as role checks) is intentionally enforced at the route level.
+# testing removing options requests from security
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Security(security)
 ):
+    if request.method =="OPTIONS":
+        return None
+        
     token = credentials.credentials
     user_resp = supabase.auth.get_user(token)
 
@@ -116,11 +121,19 @@ def get_current_user(
 # This is required for Row Level Security (RLS) to work correctly, because Supabase
 # evaluates policies (auth.jwt()) based on the JWT attached to the database request.
 # Using the global client (anon key only) will cause updates to be silently blocked
-# by RLS and return zero rows.
+# by RLS and return zero rows. ~n testing removing options requests from security
 def get_supabase_authed(credentials: HTTPAuthorizationCredentials = Security(security)):
-    token = credentials.credentials
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    #token = credentials.credentials
     sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    sb.postgrest.auth(token)
+
+    if request.method == "OPTIONS":
+        return sb
+
+    sb.postgrest.auth(credentials.credentials)
+    #sb.postgrest.auth(token)
     return sb
 
 
