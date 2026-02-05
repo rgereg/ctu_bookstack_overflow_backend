@@ -279,14 +279,25 @@ def add_to_cart(cartData: CartAdd, user=Depends(get_current_user), sb=Depends(ge
     bookRow = sb.table("books").select("*").eq("isbn", cartData.isbn).execute()
     bookId = bookRow.data[0]["id"]
     bookPrice = bookRow.data[0]["price"]
+    bookQuantity = bookRow.data[0]["quantity"]
 
     # Check if book is already present in order, if it is adjust quantity to add to current order quantity, if not insert row to order items
     checkBook = sb.table("order_items").select("*").eq("book_id", bookId).eq("order_id", cartOrderId).execute()
     if len(checkBook.data) != 0:
         newQuantity = cartData.quantity + checkBook.data[0]["quantity"]
+        # Adding a check to see if items in cart are greater than inventory
+        if newQuantity > bookQuantity:
+            raise HTTPException(status_code = 400, detail = "Number of books in cart greater than inventory")
+            return {"status": "Failed to add to cart"}
+        
         orderItemId = checkBook.data[0]["id"]
         newRow = sb.table("order_items").update({"quantity": newQuantity}).eq("id", orderItemId).execute()
     else:
+        # Check if order quantity greater than inventory again
+        if cartData.quantity > bookQuantity:
+            raise HTTPException(status_code = 400, detail = "Number of books in cart greater than inventory")
+            return {"status": "Failed to add to cart"}
+        
         newRow = sb.table("order_items").insert({"order_id": cartOrderId, "book_id": bookId, "quantity": cartData.quantity, "unit_price": bookPrice}).execute()
     
     return {"status": "Book added to cart"}
