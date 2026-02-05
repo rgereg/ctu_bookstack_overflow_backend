@@ -143,73 +143,65 @@ def checkout_instant(
     user=Depends(get_current_user),
     sb=Depends(get_supabase_authed)
 ):
-    print("Incoming data:", data.dict())
+    role = user.user_metadata.get("role")
+    if role != "employee":
+        raise HTTPException(status_code=403, detail="Forbidden")
 
-    existing_resp = sb.table("books").select("id").eq("isbn", data.book.isbn).execute()
-    if existing_resp.error:
-        print("Supabase error on select:", existing_resp.error)
-        raise HTTPException(status_code=500, detail="Database error checking book")
+    book_resp = sb.table("books").select("*").eq("isbn", data.book.isbn).execute()
 
-    if existing_resp.data:
-        book_id = existing_resp.data[0]["id"]
-        print("Book exists, id:", book_id)
+    if book_resp.data:
+        book = book_resp.data[0]
+        book_id = book["id"]
+
+        sb.table("books").update({
+            "price": data.book.price,
+            "quantity": book["quantity"] + data.quantity,
+            "updated_at": datetime.utcnow().isoformat()
+        }).eq("id", book_id).execute()
     else:
-        book_payload = {
+        insert_resp = sb.table("books").insert({
             "title": data.book.title,
             "author": data.book.author,
             "isbn": data.book.isbn,
             "description": data.book.description,
             "price": data.book.price,
-            "quantity": data.book.quantity#,
-            #"image_path": getattr(data.book, "image_path", None)
-        }
+            "quantity": data.quantity,
+            "image_path": data.book.image_path,
+            "category": data.book.category,
+            "is_featured": False
+        }).execute()
 
-        inserted = sb.table("books").insert(book_payload).execute()
-        if inserted.error:
-            print("Supabase error on insert:", inserted.error)
-            raise HTTPException(status_code=500, detail=f"Failed to insert book: {inserted.error}")
+        if not insert_resp.data:
+            raise HTTPException(status_code=500, detail="Failed to create book")
 
-        if not inserted.data or len(inserted.data) == 0:
-            print("Insert returned empty data:", inserted.data)
-            raise HTTPException(status_code=500, detail="Failed to insert book, no id returned")
+        book_id = insert_resp.data[0]["id"]
 
-        book_id = inserted.data[0]["id"]
-        print("Inserted new book, id:", book_id)
-
-    order_row = sb.table("orders").insert({
+    order_resp = sb.table("orders").insert({
         "customer_id": user.id,
-        "type": "order",
-        "status": "pending"
+        "type": "manufacturer",
+        "status": "received"
     }).execute()
 
-    if order_row.error:
-        print("Supabase error creating order:", order_row.error)
-        raise HTTPException(status_code=500, detail="Failed to create order")
+    if not order_resp.data:
+        raise HTTPException(status_code=500, detail="Failed to create manufacturer order")
 
-    if not order_row.data or len(order_row.data) == 0:
-        print("Order insert returned empty data:", order_row.data)
-        raise HTTPException(status_code=500, detail="Failed to create order, no id returned")
+    order_id = order_resp.data[0]["id"]
 
-    order_id = order_row.data[0]["id"]
-    print("Created order, id:", order_id)
-
-    item_insert = sb.table("order_items").insert({
+    sb.table("order_items").insert({
         "order_id": order_id,
         "book_id": book_id,
         "quantity": data.quantity,
         "unit_price": data.book.price
     }).execute()
 
-    if item_insert.error:
-        print("Supabase error inserting order item:", item_insert.error)
-        raise HTTPException(status_code=500, detail="Failed to add item to order")
-
-    print("Order item inserted successfully")
-
     return {
-        "status": "success",
-        "order_id": order_id
+        "status": "manufacturer_order_created",
+        "order_id": order_id,
+        "book_id": book_id,
+        "quantity_added": data.quantity
     }
+
+
 
 @app.get("/books")
 def get_books():
