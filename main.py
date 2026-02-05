@@ -368,7 +368,7 @@ def create_order_from_cart(user=Depends(get_current_user), sb=Depends(get_supaba
 
     if not order_resp.data or len(order_resp.data) == 0:
         raise HTTPException(status_code=500, detail="Failed to create order")
-
+    print("NEW ORDER ROW:", order_resp.data) # TODO REMOVE DEBUG
     order_id = order_resp.data[0]["id"]
     print(f"[DEBUG] Created order {order_id} from cart {cart_id}")
     return {"status": "order_created", "order_id": order_id, "cart_id": cart_id}
@@ -389,6 +389,7 @@ def add_cart_items_to_order(payload: CheckoutPayload, user=Depends(get_current_u
             "quantity": item["quantity"],
             "unit_price": item["unit_price"]
         }).execute()
+        print("INSERT RESPONSE:", insert_resp) # TODO REMOVE DEBUG
         if insert_resp.error:
             print(f"[DEBUG] Failed to insert item {item['id']}: {insert_resp.error}")
             raise HTTPException(status_code=500, detail=f"Failed to add item {item['id']} to order")
