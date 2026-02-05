@@ -312,6 +312,8 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
 
     bookRow = sb.table("books").select("id").eq("isbn", update.isbn).execute()
     bookId = bookRow.data[0]["id"]
+    # Adding bookQuantity for check
+    bookQuantity = bookRow.data[0]["quantity"]
     item_resp = sb.table("order_items").select("*").eq("order_id", cart_id).eq("book_id", bookId).execute()
     if not item_resp.data:
         raise HTTPException(status_code=404, detail="Item not in cart")
@@ -320,6 +322,10 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
     if update.quantity <= 0:
         sb.table("order_items").delete().eq("id", item["id"]).execute()
         return {"status": "removed"}
+    # Check if amount in cart is greater than amount in inventory
+    elif update.quantity > bookQuantity:
+        raise HTTPException(status_code = 400, detail = "Order quantity can't be larger than quantity in stock")
+        return {"status": "failed"}
     else:
         sb.table("order_items").update({"quantity": update.quantity}).eq("id", item["id"]).execute()
         return {"status": "updated", "quantity": update.quantity}
