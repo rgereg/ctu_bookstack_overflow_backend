@@ -348,6 +348,37 @@ def remove_cart_item(
 
 #checkout top placeholder do not remove
 
+@app.post("/checkout/convert-cart")
+def convert_cart_to_order(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
+    cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
+    if not cart_resp.data:
+        raise HTTPException(status_code=404, detail="No active cart found")
+    elif len(cart_resp.data) > 1:
+        raise HTTPException(status_code=400, detail="Multiple carts found for user")
+
+    cart = cart_resp.data[0]
+    cart_id = cart["id"]
+
+    update_resp = sb.table("orders").update({
+        "type": "order",
+        "status": "pending",
+        "updated_at": datetime.utcnow().isoformat()
+    }).eq("id", cart_id).execute()
+
+    if update_resp.error:
+        print(f"[DEBUG] Failed to convert cart {cart_id} to order:", update_resp.error)
+        raise HTTPException(status_code=500, detail="Failed to convert cart to order")
+
+    print(f"[DEBUG] Cart {cart_id} converted to order successfully")
+    
+    return {
+        "status": "cart_converted",
+        "order_id": cart_id,
+        "item_count": len(sb.table("order_items").select("*").eq("order_id", cart_id).execute().data or [])
+    }
+
+
+''' THE BELOW SECTION IS HELD DURING TESTING OF ALTERNATIVE METHOD
 @app.post("/checkout/create-order")
 def create_order_from_cart(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart_resp = sb.table("orders").select("*").eq("customer_id", user.id).eq("type", "cart").execute()
@@ -417,7 +448,7 @@ def clear_cart(payload: dict, user=Depends(get_current_user), sb=Depends(get_sup
 
     print(f"[DEBUG] Cleared cart {cart_id}: items_deleted={len(del_items.data) if del_items.data else 0}")
     return {"status": "cart_cleared", "cart_id": cart_id}
-
+'''
 #checkout bottom placeholder do not remove
 
 @app.get("/orders")
