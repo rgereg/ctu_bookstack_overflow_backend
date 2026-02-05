@@ -52,6 +52,12 @@ class Book(BaseModel):
     description: Optional[str] = ""
     price: float
     quantity: int
+    image_path: Optional[str] = None
+    category: Optional[str] = None
+
+    class Config:
+        extra = "ignore"
+
 
 class CartAdd(BaseModel):
     isbn: str
@@ -148,16 +154,20 @@ def checkout_instant(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     book_resp = sb.table("books").select("*").eq("isbn", data.book.isbn).execute()
-
+    if book_resp.error:
+        raise HTTPException(status_code=500, detail=str(book_resp.error))
+        
     if book_resp.data:
         book = book_resp.data[0]
         book_id = book["id"]
 
-        sb.table("books").update({
+        update_resp = sb.table("books").update({
             "price": data.book.price,
             "quantity": book["quantity"] + data.quantity,
             "updated_at": datetime.utcnow().isoformat()
         }).eq("id", book_id).execute()
+        if update_resp.error:
+            raise HTTPException(status_code=500, detail=str(update_resp.error))
     else:
         insert_resp = sb.table("books").insert({
             "title": data.book.title,
@@ -187,18 +197,19 @@ def checkout_instant(
 
     order_id = order_resp.data[0]["id"]
 
-    sb.table("order_items").insert({
+    item_resp = sb.table("order_items").insert({
         "order_id": order_id,
         "book_id": book_id,
         "quantity": data.quantity,
         "unit_price": data.book.price
     }).execute()
 
+    if item_resp.error:
+        raise HTTPException(status_code=500, detail=str(item_resp.error))
+        
     return {
         "status": "manufacturer_order_created",
-        "order_id": order_id,
-        "book_id": book_id,
-        "quantity_added": data.quantity
+        "order_id": order_id
     }
 
 
