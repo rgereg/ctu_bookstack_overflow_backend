@@ -365,7 +365,9 @@ def convert_cart_to_order(user=Depends(get_current_user), sb=Depends(get_supabas
         "updated_at": datetime.utcnow().isoformat()
     }).eq("id", cart_id).execute()
 
-    if update_resp.error:
+    # Supabase update responses don't return any error data, kept throwing an error on render when I seen it.  Going to change it to test if the response is empty
+    # as a method to see if the update failed
+    if len(update_resp.data) == 0:
         print(f"[DEBUG] Failed to convert cart {cart_id} to order:", update_resp.error)
         raise HTTPException(status_code=500, detail="Failed to convert cart to order")
 
