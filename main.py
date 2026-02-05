@@ -456,7 +456,7 @@ def clear_cart(payload: dict, user=Depends(get_current_user), sb=Depends(get_sup
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     # Same deal as /cart now, information is filtered through RLS on supabase. Employees should see all while customers only see orders tied to their user_id
-    result = sb.table("orders").select("*").execute()
+    result = sb.table("orders").select("*, books(*), order_items(*)").eq("customer_id", user.id).neq("type", "cart").execute()
     return result.data or []
 
 
