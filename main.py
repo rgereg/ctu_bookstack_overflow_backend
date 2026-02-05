@@ -85,7 +85,6 @@ class CheckoutPayload(BaseModel):
     cart_id: str
 
 
-
 #def get_current_user(authorization: Optional[str] = Header(None)):
 #    if not authorization or not authorization.startswith("Bearer "):
 #        raise HTTPException(status_code=401, detail="Missing or invalid auth header: get current user")
@@ -382,21 +381,31 @@ def add_cart_items_to_order(payload: CheckoutPayload, user=Depends(get_current_u
     if not items_resp.data:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
+    inserted_items = []
+    
     for item in items_resp.data:
         insert_resp = sb.table("order_items").insert({
             "order_id": order_id,
             "book_id": item["book_id"],
             "quantity": item["quantity"],
             "unit_price": item["unit_price"]
-        }).execute()
+        }).execute(headers={"Prefer": "return=representation"})
         print("INSERT RESPONSE:", insert_resp) # TODO REMOVE DEBUG
         if insert_resp.error:
             print(f"[DEBUG] Failed to insert item {item['id']}: {insert_resp.error}")
             raise HTTPException(status_code=500, detail=f"Failed to add item {item['id']} to order")
 
-    print(f"[DEBUG] Added {len(items_resp.data)} items from cart {cart_id} to order {order_id}")
-    return {"status": "items_added", "order_id": order_id, "item_count": len(items_resp.data)}
+        # TODO REMOVE DEBUG SECTIONS
+        inserted_items.extend(insert_resp.data)
 
+    print(f"[DEBUG] Added {len(items_resp.data)} items from cart {cart_id} to order {order_id}")
+    return {
+        "status": "items_added",
+        "order_id": order_id,
+        "item_count": len(items_resp.data),
+        "inserted_items": inserted_items
+    }
+    
 @app.post("/checkout/clear-cart")
 def clear_cart(payload: dict, user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
     cart_id = payload.get("cart_id")
