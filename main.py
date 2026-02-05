@@ -310,7 +310,7 @@ def update_cart_item(update: UpdateQuantity, user=Depends(get_current_user), sb=
         raise HTTPException(status_code=400, detail="No active cart")
     cart_id = cart_resp.data[0]["id"]
 
-    bookRow = sb.table("books").select("*").eq("isbn", update.isbn).execute()
+    bookRow = sb.table("books").select("id, quantity").eq("isbn", update.isbn).execute()
     bookId = bookRow.data[0]["id"]
     # Adding bookQuantity for check
     bookQuantity = bookRow.data[0]["quantity"]
