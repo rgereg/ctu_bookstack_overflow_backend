@@ -167,7 +167,7 @@ def checkout_instant(
             "updated_at": datetime.utcnow().isoformat()
         }).eq("id", book_id).execute()
         if len(update_resp.data) == 0:
-            raise HTTPException(status_code=500, detail="Failed to update book"))
+            raise HTTPException(status_code=500, detail="Failed to update book")
     else:
         insert_resp = sb.table("books").insert({
             "title": data.book.title,
