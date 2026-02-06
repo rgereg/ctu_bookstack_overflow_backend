@@ -186,6 +186,9 @@ def checkout_instant(
 
         book_id = insert_resp.data[0]["id"]
 
+    # checkout_instant fails at this line, render mentions it breaking an RLS policy. I tried changing the policy, worth a shot to try again to see if it has updated whenever
+    # someone sees this. If we need to we can default employee access to true since we limit what they can interact with from the frontend. Employees won't be able
+    # to create any orders besides manufacturer ones with this setup already.
     order_resp = sb.table("orders").insert({
         "customer_id": user.id,
         "type": "manufacturer",
