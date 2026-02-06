@@ -155,10 +155,8 @@ def checkout_instant(
         raise HTTPException(status_code=403, detail="Forbidden")
 
     book_resp = sb.table("books").select("*").eq("isbn", data.book.isbn).execute()
-    # There's no error attribute attached to any supabase returns. Changed this to check for any items in response, but might be redundant with next if else below
-    if len(book_resp.data) == 0:
-        raise HTTPException(status_code=500, detail="Book not in database")
-        
+    
+    # Dropped initial if statement to check if book is in database, should just have the two branches cover if book is present or not   
     if len(book_resp.data) != 0:
         book = book_resp.data[0]
         book_id = book["id"]
@@ -168,8 +166,8 @@ def checkout_instant(
             "quantity": book["quantity"] + data.quantity,
             "updated_at": datetime.utcnow().isoformat()
         }).eq("id", book_id).execute()
-        if update_resp.error:
-            raise HTTPException(status_code=500, detail=str(update_resp.error))
+        if len(update_resp.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to update book"))
     else:
         insert_resp = sb.table("books").insert({
             "title": data.book.title,
@@ -206,9 +204,8 @@ def checkout_instant(
         "unit_price": data.book.price
     }).execute()
 
-    # Changed again to check if row was returned from insert call to test if it was successful
     if len(item_resp.data) == 0:
-        raise HTTPException(status_code=500, detail="Failed to create manufacturer order")
+        raise HTTPException(status_code=500, detail="Failed to add items to manufacturer order")
         
     return {
         "status": "manufacturer_order_created",
