@@ -389,6 +389,7 @@ def convert_cart_to_order(user=Depends(get_current_user), sb=Depends(get_supabas
         cur_book_quantity = book.data[0]["quantity"]
         new_book_quantity = cur_book_quantity - item["quantity"]
         bookUpdate = sb.table("books").update({"quantity": new_book_quantity}).eq("id", item["book_id"]).execute()
+        print(bookUpdate.data)
 
     update_resp = sb.table("orders").update({
         "type": "order",
