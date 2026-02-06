@@ -385,6 +385,7 @@ def convert_cart_to_order(user=Depends(get_current_user), sb=Depends(get_supabas
     # Going to add a function to remove quantity ordered from book quantity
     cart_items = sb.table("order_items").select("*").eq("order_id", cart_id).execute()
     for item in cart_items.data:
+        # Should search every book in the order_items table and update the quantity
         book = sb.table("books").select("quantity").eq("id", item["book_id"]).execute()
         cur_book_quantity = book.data[0]["quantity"]
         new_book_quantity = cur_book_quantity - item["quantity"]
