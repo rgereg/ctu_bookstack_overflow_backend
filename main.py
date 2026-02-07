@@ -494,7 +494,7 @@ def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
         # For each row in order's order_items
         for item in order["order_items"]:
             # Select book title with matching id
-            bookRow = sb.table("books").select("title").eq("id", item["id"]).execute()
+            bookRow = sb.table("books").select("title").eq("id", item["book_id"]).execute()
             bookTitle = bookRow.data[0]["title"]
             # Add field to row containing title of book
             item.update({"title": bookTitle})
