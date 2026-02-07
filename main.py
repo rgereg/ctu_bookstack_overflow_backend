@@ -487,10 +487,18 @@ def clear_cart(payload: dict, user=Depends(get_current_user), sb=Depends(get_sup
 
 @app.get("/orders")
 def get_orders(user=Depends(get_current_user), sb=Depends(get_supabase_authed)):
-    # Same deal as /cart now, information is filtered through RLS on supabase. Employees should see all while customers only see orders tied to their user_id
-    # The orders table doesn't have a foreign key connected to the books table, can't call titles of books from orders. Gonna keep it simple unless we really need it
-    result = sb.table("orders").select("*, order_items(*)").neq("type", "cart").execute()
-    return result.data or []
+    # Going to change to try to add titles to the results dictionary list
+    orderRows = sb.table("orders").select("*, order_items(*)").neq("type", "cart").execute()
+    # For each row in the orderRows select
+    for order in orderRows.data:
+        # For each row in order's order_items
+        for item in order["order_items"]:
+            # Select book title with matching id
+            bookRow = sb.table("books").select("title").eq("id", item["id"]).execute()
+            bookTitle = bookRow.data[0]["title"]
+            # Add field to row containing title of book
+            item.update({"title": bookTitle})
+    return orderRows.data or []
 
 
 @app.post("/orders")
